@@ -1,0 +1,54 @@
+# ==================== IDE/编辑器配置 ====================
+# VSCode
+.vscode/
+!.vscode/extensions.json  # 可选：保留推荐扩展清单
+!.vscode/settings.json     # 可选：若团队统一配置可保留
+!.vscode/tasks.json
+!.vscode/launch.json
+# Android Studio/IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+# Vim
+*.swp
+*.swo
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ==================== 系统临时文件 ====================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ==================== 敏感/本地配置 ====================
+# 环境变量文件（如API密钥、测试配置）
+.env
+.env.local
+.env.*.local
+# 日志文件
+*.log
+# 临时文件
+tmp/
+temp/
+# 备份文件
+*.bak
+*.backup
+# 压缩包
+*.zip
+*.rar
+*.7z
