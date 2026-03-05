@@ -1,0 +1,9 @@
+{
+  "base_url": "https://api.openai.com",
+  "api_key": "sk-xxxx",
+  "model": "gpt-4o-mini",
+  "timeout_sec": 30,
+  "system_prompt_file": "config/prompts/system_prompt.md",
+  "user_prompt_file": "config/prompts/user_prompt.md",
+  "agents_file": "config/agents.json"
+}

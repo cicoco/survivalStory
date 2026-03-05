@@ -52,3 +52,15 @@ temp/
 *.zip
 *.rar
 *.7z
+
+# ==================== Python / uv ====================
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+game.db
+config/openai.json

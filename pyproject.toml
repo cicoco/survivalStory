@@ -1,0 +1,18 @@
+[project]
+name = "survival-story"
+version = "0.1.0"
+description = "Console survival game prototype with lobby, multi-agent AI, and phase-based rules."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+survival-host = "game.net_host:run_host_server"
+survival-client = "game.net_client:run_client"
+
+[tool.setuptools]
+packages = ["game"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

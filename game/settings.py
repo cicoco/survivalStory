@@ -1,0 +1,51 @@
+from __future__ import annotations
+
+import json
+import os
+from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass
+class OpenAISettings:
+    base_url: str
+    api_key: str
+    model: str
+    timeout_sec: int
+    system_prompt_file: str
+    user_prompt_file: str
+    agents_file: str
+
+    @classmethod
+    def load(cls, config_path: str = "config/openai.json") -> "OpenAISettings":
+        data = {}
+        p = Path(config_path)
+        if p.exists():
+            data = json.loads(p.read_text(encoding="utf-8"))
+
+        base_url = os.getenv("SURVIVAL_OPENAI_BASE_URL", data.get("base_url", "")).strip()
+        api_key = os.getenv("SURVIVAL_OPENAI_API_KEY", data.get("api_key", "")).strip()
+        model = os.getenv("SURVIVAL_OPENAI_MODEL", data.get("model", "gpt-4o-mini")).strip()
+        timeout_sec = int(os.getenv("SURVIVAL_OPENAI_TIMEOUT_SEC", str(data.get("timeout_sec", 30))))
+        system_prompt_file = os.getenv(
+            "SURVIVAL_AI_SYSTEM_PROMPT_FILE",
+            data.get("system_prompt_file", data.get("prompt_file", "AI提示词.md")),
+        ).strip()
+        user_prompt_file = os.getenv(
+            "SURVIVAL_AI_USER_PROMPT_FILE",
+            data.get("user_prompt_file", "config/prompts/user_prompt.md"),
+        ).strip()
+        agents_file = os.getenv("SURVIVAL_AI_AGENTS_FILE", data.get("agents_file", "config/agents.json")).strip()
+
+        if not base_url or not api_key:
+            raise ValueError("missing_openai_config: base_url/api_key required")
+
+        return cls(
+            base_url=base_url.rstrip("/"),
+            api_key=api_key,
+            model=model,
+            timeout_sec=timeout_sec,
+            system_prompt_file=system_prompt_file,
+            user_prompt_file=user_prompt_file,
+            agents_file=agents_file,
+        )
