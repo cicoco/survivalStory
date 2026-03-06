@@ -4,7 +4,7 @@ import random
 import uuid
 
 from game.agents.runtime import AgentRuntime, load_agent_configs
-from game.constants import DEFAULT_ROOM_SIZE, MAP_GRID, MAX_ACTIONS_PER_PHASE, START_EXPOSURE, START_FOOD, START_WATER
+from game.constants import DEFAULT_ROOM_SIZE, MAP_GRID, MAX_ACTIONS_PER_PHASE, SAFE_TILES, START_EXPOSURE, START_FOOD, START_WATER
 from game.memory.service import MemoryService
 from game.models import Action, ActionKind, PlayerState, RoomState
 from game.rules import apply_action, check_death, init_building_loot, settle_phase
@@ -16,7 +16,7 @@ def _safe_positions() -> list[tuple[int, int]]:
     out = []
     for y in range(1, 10):
         for x in range(1, 10):
-            if MAP_GRID[y - 1][x - 1] in {"J", "B", "S", "W", "M"}:
+            if MAP_GRID[y - 1][x - 1] in SAFE_TILES:
                 out.append((x, y))
     return out
 
@@ -131,7 +131,16 @@ class GameEngine:
                 "message": f"[#{action_seq}] {message}",
             }
             self.memory.add(event)
-            self.store.log(self.game_id, self.room.phase_no, self.room.phase.value, actor.player_id, "action_result", event)
+            self.store.log(
+                self.game_id,
+                self.room.phase_no,
+                self.room.phase.value,
+                actor.player_id,
+                "action_result",
+                event,
+                room_id=self.room.room_id,
+                action_seq=action_seq,
+            )
             self._emit(event)
 
         dead, reason = check_death(actor, self.room.phase)
@@ -147,7 +156,16 @@ class GameEngine:
                 "reason": reason,
             }
             self.memory.add(event)
-            self.store.log(self.game_id, self.room.phase_no, self.room.phase.value, actor.player_id, "death", event)
+            self.store.log(
+                self.game_id,
+                self.room.phase_no,
+                self.room.phase.value,
+                actor.player_id,
+                "death",
+                event,
+                room_id=self.room.room_id,
+                action_seq=action_seq,
+            )
             self._emit(event)
 
         if actor.alive and actor.phase_actions_used >= MAX_ACTIONS_PER_PHASE:
@@ -161,7 +179,16 @@ class GameEngine:
                 "reason": f"max_actions_{MAX_ACTIONS_PER_PHASE}",
             }
             self.memory.add(event)
-            self.store.log(self.game_id, self.room.phase_no, self.room.phase.value, actor.player_id, "phase_auto_end", event)
+            self.store.log(
+                self.game_id,
+                self.room.phase_no,
+                self.room.phase.value,
+                actor.player_id,
+                "phase_auto_end",
+                event,
+                room_id=self.room.room_id,
+                action_seq=action_seq,
+            )
             self._emit(event)
 
         if not self.alive_humans():
@@ -208,7 +235,16 @@ class GameEngine:
                 "message": msg,
             }
             self.memory.add(event)
-            self.store.log(self.game_id, settle_phase_no, settle_phase_name, None, "phase_settle", event)
+            self.store.log(
+                self.game_id,
+                settle_phase_no,
+                settle_phase_name,
+                None,
+                "phase_settle",
+                event,
+                room_id=self.room.room_id,
+                action_seq=None,
+            )
             self._emit(event)
 
     def run_until_finish(self, human_action_provider) -> None:
@@ -217,7 +253,7 @@ class GameEngine:
 
         survivors = [p.name for p in self.room.players if p.alive]
         summary = ",".join(survivors) if survivors else "none"
-        self.store.save_summary(self.game_id, summary, self.room.finish_reason)
+        self.store.save_summary(self.game_id, summary, self.room.finish_reason, room_id=self.room.room_id)
         self._emit(
             {
                 "event_type": "game_over",

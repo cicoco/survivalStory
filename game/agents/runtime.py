@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from game.agents.openai_client import OpenAIClient
+from game.constants import normalize_item_id
 from game.models import Action, ActionKind, PlayerState, RoomState
 from game.settings import OpenAISettings
 
@@ -46,19 +47,21 @@ class AgentRuntime:
             api_key=settings.api_key,
             model=settings.model,
             timeout_sec=settings.timeout_sec,
+            log_io=settings.log_io,
+            log_max_chars=settings.log_max_chars,
         )
 
     def decide(self, room: RoomState, actor: PlayerState) -> Action:
         cfg = self.configs.get(actor.player_id, AgentConfig(agent_id=actor.player_id, persona_prompt="你保持稳健生存策略。"))
         same_pos_names = [p.name for p in room.players if p.alive and p.player_id != actor.player_id and p.pos() == actor.pos()]
-        building_loot = room.building_loot.get(actor.pos(), {})
+        building_loot = actor.known_building_loot.get(actor.pos())
         ctx = self._build_context(room, actor, cfg.persona_prompt, same_pos_names, building_loot)
         user_prompt = self._render_template(self.user_template, ctx)
         ctx["{{current_situation}}"] = user_prompt
         system_prompt = self._render_system_prompt(self.system_template, ctx)
 
         try:
-            content = self.client.chat(system_prompt, user_prompt)
+            content = self.client.chat(system_prompt, user_prompt, trace_tag=actor.name)
             return self._parse_action(room, actor, content)
         except Exception as err:
             return Action(actor.player_id, ActionKind.REST, source="AI", reason=f"llm_error:{err}")
@@ -95,6 +98,7 @@ class AgentRuntime:
                 item = normalized[4:-1].strip()
             else:
                 item = normalized[3:-1].strip()
+            item = normalize_item_id(item)
             return Action(actor.player_id, ActionKind.USE, {"item": item}, source="AI", reason=reason)
 
         if (raw_upper.startswith("TAKE(") and raw_upper.endswith(")")) or (raw.startswith("拿取(") and raw.endswith(")")):
@@ -102,7 +106,7 @@ class AgentRuntime:
                 body = normalized[5:-1]
             else:
                 body = normalized[3:-1]
-            items = [x.strip() for x in body.split(",") if x.strip()]
+            items = [normalize_item_id(x.strip()) for x in body.split(",") if x.strip()]
             if not items:
                 items = [""]
             return Action(actor.player_id, ActionKind.TAKE, {"items": items[:3]}, source="AI", reason=reason)
@@ -125,7 +129,7 @@ class AgentRuntime:
         actor: PlayerState,
         persona_prompt: str,
         same_pos_names: list[str],
-        building_loot: dict[str, int],
+        building_loot: dict[str, int] | None,
     ) -> dict[str, str]:
         phase_cn = "白天" if room.phase.value == "DAY" else "夜晚"
         return {
@@ -164,7 +168,9 @@ class AgentRuntime:
             return "无"
         return ",".join(f"{k}-{v}" for k, v in bag.items() if v > 0) or "无"
 
-    def _loot_text(self, loot: dict[str, int]) -> str:
+    def _loot_text(self, loot: dict[str, int] | None) -> str:
+        if loot is None:
+            return "UNKNOWN"
         if not loot:
             return "无"
         return ",".join(f"{k}-{v}" for k, v in loot.items())

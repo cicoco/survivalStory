@@ -41,36 +41,14 @@ class EventStore:
                 CREATE TABLE IF NOT EXISTS game_summary (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     game_id TEXT NOT NULL,
-                    room_id TEXT,
-                    winner_text TEXT NOT NULL,
-                    survivors_text TEXT,
+                    room_id TEXT NOT NULL,
+                    survivors_text TEXT NOT NULL,
                     finish_reason TEXT NOT NULL,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 );
                 """
             )
-            self._migrate_columns(conn)
             self._ensure_indexes(conn)
-
-    def _migrate_columns(self, conn: sqlite3.Connection) -> None:
-        event_cols = {row[1] for row in conn.execute("PRAGMA table_info(event_log);")}
-        if "room_id" not in event_cols:
-            conn.execute("ALTER TABLE event_log ADD COLUMN room_id TEXT;")
-        if "action_seq" not in event_cols:
-            conn.execute("ALTER TABLE event_log ADD COLUMN action_seq INTEGER;")
-
-        summary_cols = {row[1] for row in conn.execute("PRAGMA table_info(game_summary);")}
-        if "room_id" not in summary_cols:
-            conn.execute("ALTER TABLE game_summary ADD COLUMN room_id TEXT;")
-        if "survivors_text" not in summary_cols:
-            conn.execute("ALTER TABLE game_summary ADD COLUMN survivors_text TEXT;")
-            conn.execute(
-                """
-                UPDATE game_summary
-                SET survivors_text = winner_text
-                WHERE survivors_text IS NULL;
-                """
-            )
 
     def _ensure_indexes(self, conn: sqlite3.Connection) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_event_log_game_phase_id ON event_log(game_id, phase_no, id);")
@@ -125,14 +103,17 @@ class EventStore:
         self._exec_with_retry(_write)
 
     def save_summary(self, game_id: str, survivors_text: str, finish_reason: str, room_id: str | None = None) -> None:
+        if room_id is None:
+            raise ValueError("room_id_required_for_summary")
+
         def _write():
             with self._conn() as conn:
                 conn.execute(
                     """
-                    INSERT INTO game_summary (game_id, room_id, winner_text, survivors_text, finish_reason)
-                    VALUES (?, ?, ?, ?, ?);
+                    INSERT INTO game_summary (game_id, room_id, survivors_text, finish_reason)
+                    VALUES (?, ?, ?, ?);
                     """,
-                    (game_id, room_id, survivors_text, survivors_text, finish_reason),
+                    (game_id, room_id, survivors_text, finish_reason),
                 )
 
         self._exec_with_retry(_write)

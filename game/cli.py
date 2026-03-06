@@ -1,9 +1,30 @@
 from __future__ import annotations
 
-from game.constants import MAP_GRID
+from game.constants import ITEM_EFFECTS, MAP_GRID, building_zh_label, item_zh_label, normalize_item_id
 from game.engine import GameEngine
 from game.lobby import RoomManager
 from game.models import Action, ActionKind, PlayerState, RoomState
+
+def _normalize_item_token(token: str) -> str:
+    return normalize_item_id(token.strip())
+
+
+def _format_item_dict(items: dict[str, int]) -> str:
+    if not items:
+        return "{}"
+    parts = []
+    for item_id, cnt in items.items():
+        if cnt <= 0:
+            continue
+        parts.append(f"{item_zh_label(item_id)}:{cnt}")
+    return "{" + ", ".join(parts) + "}" if parts else "{}"
+
+
+def _known_loot_text(actor: PlayerState) -> str:
+    loot = actor.known_building_loot.get(actor.pos())
+    if loot is None:
+        return "未知(先EXPLORE后可见)"
+    return _format_item_dict(loot)
 
 
 def render_status(room: RoomState, actor: PlayerState) -> None:
@@ -11,16 +32,26 @@ def render_status(room: RoomState, actor: PlayerState) -> None:
     same_pos = [p.name for p in room.players if p.alive and p.player_id != actor.player_id and p.pos() == actor.pos()]
     print("")
     print(f"=== Phase {room.phase_no} | {room.phase.value} ===")
-    print(f"你: {actor.name} {'(存活)' if actor.alive else '(死亡)'} 位置=({actor.x},{actor.y}) 区域={tile}")
+    print(f"你: {actor.name} {'(存活)' if actor.alive else '(死亡)'} 位置=({actor.x},{actor.y}) 区域={building_zh_label(tile)}({tile})")
     print(f"状态: 水={actor.water} 食={actor.food} 曝光={actor.exposure} 本阶段动作数={actor.phase_actions_used}")
-    print(f"背包: {actor.bag if actor.bag else '{}'}")
+    print(f"背包: {_format_item_dict(actor.bag)}")
     print(f"同建筑其他角色: {same_pos if same_pos else '无'}")
-    print(f"当前建筑物资: {room.building_loot.get(actor.pos(), {})}")
-    print("命令: move x y | explore | use 物品名 | take 物品1 物品2 物品3 | rest | attack 角色名 | status | help")
+    print(f"当前建筑物资: {_known_loot_text(actor)}")
+    print("命令: MOVE x y | EXPLORE | USE 物资标识 | TAKE 物资1 物资2 物资3 | REST | ATTACK 玩家名 | STATUS | HELP")
+    print("物资别名/编码: B/BREAD W/BOTTLED_WATER C/BISCUIT G/CANNED_FOOD T/BARREL_WATER Q/CLEAN_WATER")
 
 
 def parse_command(room: RoomState, actor: PlayerState, text: str) -> Action | None:
-    parts = text.strip().split()
+    normalized = (
+        text.strip()
+        .replace("（", " ")
+        .replace("）", " ")
+        .replace("(", " ")
+        .replace(")", " ")
+        .replace("，", " ")
+        .replace(",", " ")
+    )
+    parts = [p for p in normalized.split() if p]
     if not parts:
         return None
     cmd = parts[0].lower()
@@ -29,24 +60,29 @@ def parse_command(room: RoomState, actor: PlayerState, text: str) -> Action | No
         render_status(room, actor)
         return None
     if cmd == "help":
-        print("示例: move 2 3 / explore / use 瓶装水 / take 面包 瓶装水 / rest / attack AI_1")
+        print("示例: MOVE 2 3 / EXPLORE / USE W / USE BOTTLED_WATER / TAKE B W / REST / ATTACK AI_1")
+        print("物资别名/编码: B/BREAD W/BOTTLED_WATER C/BISCUIT G/CANNED_FOOD T/BARREL_WATER Q/CLEAN_WATER")
         return None
     if cmd == "move" and len(parts) >= 3:
         try:
             x = int(parts[1])
             y = int(parts[2])
         except ValueError:
-            print("move 需要数字坐标，例如: move 2 3")
+            print("MOVE 需要数字坐标，例如: MOVE 2 3")
             return None
         return Action(actor.player_id, ActionKind.MOVE, {"x": x, "y": y}, source="HUMAN")
     if cmd == "explore":
         return Action(actor.player_id, ActionKind.EXPLORE, source="HUMAN")
     if cmd == "use" and len(parts) >= 2:
-        return Action(actor.player_id, ActionKind.USE, {"item": " ".join(parts[1:])}, source="HUMAN")
+        item = _normalize_item_token(" ".join(parts[1:]))
+        if item not in ITEM_EFFECTS:
+            print("未知物资，输入 HELP 查看支持的别名/编码。")
+            return None
+        return Action(actor.player_id, ActionKind.USE, {"item": item}, source="HUMAN")
     if cmd == "take":
-        items = parts[1:4]
+        items = [_normalize_item_token(x) for x in parts[1:4]]
         if not items:
-            print("take 至少传一个物品名")
+            print("TAKE 至少需要一个物资。")
             return None
         return Action(actor.player_id, ActionKind.TAKE, {"items": items}, source="HUMAN")
     if cmd == "rest":
@@ -55,11 +91,11 @@ def parse_command(room: RoomState, actor: PlayerState, text: str) -> Action | No
         target_name = " ".join(parts[1:])
         target = next((p for p in room.players if p.alive and p.name == target_name), None)
         if not target:
-            print("目标不存在或已死亡")
+            print("目标不存在或已死亡。")
             return None
         return Action(actor.player_id, ActionKind.ATTACK, {"target_id": target.player_id}, source="HUMAN")
 
-    print("无法识别的命令，输入 help 查看示例")
+    print("无法识别的命令，输入 HELP 查看示例。")
     return None
 
 

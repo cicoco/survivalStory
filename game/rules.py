@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from copy import deepcopy
 
-from game.constants import ACTION_COSTS, BASE_PHASE_COST, BUILDING_LOOT_TEMPLATE, MAP_GRID, SAFE_TILES
+from game.constants import ACTION_COSTS, BASE_PHASE_COST, BUILDING_LOOT_TEMPLATE, EXPLORE_TILES, MAP_GRID, SAFE_TILES, item_zh_label
 from game.models import Action, ActionKind, Phase, PlayerState, RoomState
 
 
@@ -37,7 +37,9 @@ def check_death(player: PlayerState, phase: Phase) -> tuple[bool, str]:
     tile = tile_at(player.x, player.y)
     if phase == Phase.DAY and tile in {"Q", "X"}:
         return True, f"day_on_{tile}"
-    if phase == Phase.NIGHT and tile in {"Q", "X"}:
+    if phase == Phase.NIGHT and tile == "Q":
+        return True, "night_on_Q"
+    if phase == Phase.NIGHT and tile == "X":
         survival = max(0, min(100, 100 - (player.exposure / 10.0) * 5))
         if random.random() * 100 > survival:
             return True, f"night_{tile}_roll_fail"
@@ -66,7 +68,7 @@ def validate_action(room: RoomState, actor: PlayerState, action: Action) -> tupl
         return True, ""
 
     if action.kind == ActionKind.EXPLORE:
-        if tile_at(actor.x, actor.y) not in {"J", "B", "S", "W"}:
+        if tile_at(actor.x, actor.y) not in EXPLORE_TILES:
             return False, "explore_not_allowed_here"
         return True, ""
 
@@ -126,6 +128,7 @@ def apply_action(room: RoomState, actor: PlayerState, action: Action) -> dict:
         c = phase_costs["EXPLORE"]
         apply_delta(actor, water=c["water"], food=c["food"], exposure=c["exposure"])
         actor.explored_positions.add(actor.pos())
+        actor.known_building_loot[actor.pos()] = deepcopy(room.building_loot.get(actor.pos(), {}))
         result["events"].append(f"{actor.name} 完成探索")
 
     elif action.kind == ActionKind.USE:
@@ -135,7 +138,7 @@ def apply_action(room: RoomState, actor: PlayerState, action: Action) -> dict:
         actor.bag[item] = actor.bag.get(item, 0) - 1
         eff = ITEM_EFFECTS[item]
         apply_delta(actor, water=eff["water"], food=eff["food"])
-        result["events"].append(f"{actor.name} 使用 {item}")
+        result["events"].append(f"{actor.name} 使用 {item_zh_label(item)}")
 
     elif action.kind == ActionKind.REST:
         apply_delta(actor, exposure=-10)
@@ -153,7 +156,10 @@ def apply_action(room: RoomState, actor: PlayerState, action: Action) -> dict:
                 room_loot[item] -= 1
                 actor.bag[item] = actor.bag.get(item, 0) + 1
                 taken.append(item)
-        result["events"].append(f"{actor.name} 拿取: {','.join(taken) if taken else '无'}")
+        if actor.pos() in actor.explored_positions:
+            actor.known_building_loot[actor.pos()] = deepcopy(room_loot)
+        taken_text = ",".join(item_zh_label(x) for x in taken) if taken else "无"
+        result["events"].append(f"{actor.name} 拿取: {taken_text}")
 
     elif action.kind == ActionKind.ATTACK:
         c = phase_costs["ATTACK"]

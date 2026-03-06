@@ -43,6 +43,7 @@ class PlayerState:
     take_locked_in_phase: bool = False
     phase_actions_used: int = 0
     explored_positions: set[tuple[int, int]] = field(default_factory=set)
+    known_building_loot: dict[tuple[int, int], dict[str, int]] = field(default_factory=dict)
     survival_phases: int = 0
 
     def pos(self) -> tuple[int, int]:

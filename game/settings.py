@@ -13,6 +13,8 @@ class OpenAISettings:
     api_key: str
     model: str
     timeout_sec: int
+    log_io: bool
+    log_max_chars: int
     system_prompt_file: str
     user_prompt_file: str
     agents_file: str
@@ -29,6 +31,9 @@ class OpenAISettings:
         api_key = os.getenv("SURVIVAL_OPENAI_API_KEY", data.get("api_key", "")).strip()
         model = os.getenv("SURVIVAL_OPENAI_MODEL", data.get("model", "gpt-4o-mini")).strip()
         timeout_sec = int(os.getenv("SURVIVAL_OPENAI_TIMEOUT_SEC", str(data.get("timeout_sec", 30))))
+        log_io_raw = os.getenv("SURVIVAL_OPENAI_LOG_IO", str(data.get("log_io", False))).strip().lower()
+        log_io = log_io_raw in {"1", "true", "yes", "on"}
+        log_max_chars = int(os.getenv("SURVIVAL_OPENAI_LOG_MAX_CHARS", str(data.get("log_max_chars", 1200))))
         system_prompt_file = os.getenv(
             "SURVIVAL_AI_SYSTEM_PROMPT_FILE",
             data.get("system_prompt_file", data.get("prompt_file", "config/prompts/system_prompt.md")),
@@ -50,6 +55,8 @@ class OpenAISettings:
             api_key=api_key,
             model=model,
             timeout_sec=timeout_sec,
+            log_io=log_io,
+            log_max_chars=log_max_chars,
             system_prompt_file=system_prompt_file,
             user_prompt_file=user_prompt_file,
             agents_file=agents_file,
