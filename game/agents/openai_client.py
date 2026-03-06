@@ -8,12 +8,13 @@ from urllib import request
 @dataclass
 class OpenAIClient:
     base_url: str
+    chat_path: str
     api_key: str
     model: str
     timeout_sec: int = 30
 
     def chat(self, system_prompt: str, user_prompt: str) -> str:
-        url = f"{self.base_url}/v1/chat/completions"
+        url = f"{self.base_url}{self.chat_path}"
         payload = {
             "model": self.model,
             "temperature": 0.2,

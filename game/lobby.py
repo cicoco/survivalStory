@@ -4,9 +4,6 @@ import random
 import string
 from dataclasses import dataclass, field
 
-from game.constants import ROOM_SIZE
-
-
 @dataclass
 class LobbyPlayer:
     player_id: str
@@ -18,6 +15,7 @@ class LobbyPlayer:
 class RoomLobby:
     room_id: str
     host_player_id: str
+    max_players: int
     started: bool = False
     players: list[LobbyPlayer] = field(default_factory=list)
 
@@ -26,7 +24,10 @@ class RoomLobby:
 
 
 class RoomManager:
-    def __init__(self) -> None:
+    def __init__(self, max_players: int = 6) -> None:
+        if max_players < 1:
+            raise ValueError("max_players_must_be_positive")
+        self.max_players = max_players
         self.rooms: dict[str, RoomLobby] = {}
         self._player_seq = 0
 
@@ -40,10 +41,13 @@ class RoomManager:
             if code not in self.rooms:
                 return code
 
-    def create_room(self, host_name: str) -> tuple[RoomLobby, LobbyPlayer]:
+    def create_room(self, host_name: str, max_players: int | None = None) -> tuple[RoomLobby, LobbyPlayer]:
+        room_max = self.max_players if max_players is None else max_players
+        if room_max < 1:
+            raise ValueError("max_players_must_be_positive")
         room_id = self._next_room_id()
         host = LobbyPlayer(player_id=self._next_player_id(), name=host_name, is_host=True)
-        room = RoomLobby(room_id=room_id, host_player_id=host.player_id, players=[host])
+        room = RoomLobby(room_id=room_id, host_player_id=host.player_id, max_players=room_max, players=[host])
         self.rooms[room_id] = room
         return room, host
 
@@ -53,7 +57,7 @@ class RoomManager:
             raise ValueError("room_not_found")
         if room.started:
             raise ValueError("room_already_started")
-        if len(room.players) >= ROOM_SIZE:
+        if len(room.players) >= room.max_players:
             raise ValueError("room_full")
         if any(p.name == name for p in room.players):
             raise ValueError("duplicate_name")

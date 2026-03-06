@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
 from pathlib import Path
 
 
@@ -12,8 +13,9 @@ class EventStore:
         self._init_db()
 
     def _conn(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=5.0)
         conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=3000;")
         return conn
 
     def _init_db(self) -> None:
@@ -23,8 +25,10 @@ class EventStore:
                 CREATE TABLE IF NOT EXISTS event_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     game_id TEXT NOT NULL,
+                    room_id TEXT,
                     phase_no INTEGER NOT NULL,
                     phase TEXT NOT NULL,
+                    action_seq INTEGER,
                     actor_id TEXT,
                     event_type TEXT NOT NULL,
                     payload_json TEXT NOT NULL,
@@ -37,29 +41,98 @@ class EventStore:
                 CREATE TABLE IF NOT EXISTS game_summary (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     game_id TEXT NOT NULL,
+                    room_id TEXT,
                     winner_text TEXT NOT NULL,
+                    survivors_text TEXT,
                     finish_reason TEXT NOT NULL,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 );
                 """
             )
+            self._migrate_columns(conn)
+            self._ensure_indexes(conn)
 
-    def log(self, game_id: str, phase_no: int, phase: str, actor_id: str | None, event_type: str, payload: dict) -> None:
-        with self._conn() as conn:
+    def _migrate_columns(self, conn: sqlite3.Connection) -> None:
+        event_cols = {row[1] for row in conn.execute("PRAGMA table_info(event_log);")}
+        if "room_id" not in event_cols:
+            conn.execute("ALTER TABLE event_log ADD COLUMN room_id TEXT;")
+        if "action_seq" not in event_cols:
+            conn.execute("ALTER TABLE event_log ADD COLUMN action_seq INTEGER;")
+
+        summary_cols = {row[1] for row in conn.execute("PRAGMA table_info(game_summary);")}
+        if "room_id" not in summary_cols:
+            conn.execute("ALTER TABLE game_summary ADD COLUMN room_id TEXT;")
+        if "survivors_text" not in summary_cols:
+            conn.execute("ALTER TABLE game_summary ADD COLUMN survivors_text TEXT;")
             conn.execute(
                 """
-                INSERT INTO event_log (game_id, phase_no, phase, actor_id, event_type, payload_json)
-                VALUES (?, ?, ?, ?, ?, ?);
-                """,
-                (game_id, phase_no, phase, actor_id, event_type, json.dumps(payload, ensure_ascii=False)),
+                UPDATE game_summary
+                SET survivors_text = winner_text
+                WHERE survivors_text IS NULL;
+                """
             )
 
-    def save_summary(self, game_id: str, winner_text: str, finish_reason: str) -> None:
-        with self._conn() as conn:
-            conn.execute(
-                """
-                INSERT INTO game_summary (game_id, winner_text, finish_reason)
-                VALUES (?, ?, ?);
-                """,
-                (game_id, winner_text, finish_reason),
-            )
+    def _ensure_indexes(self, conn: sqlite3.Connection) -> None:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_event_log_game_phase_id ON event_log(game_id, phase_no, id);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_event_log_room_phase_seq ON event_log(room_id, phase_no, action_seq, id);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_event_log_event_type ON event_log(event_type);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_game_summary_game ON game_summary(game_id);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_game_summary_room ON game_summary(room_id);")
+
+    def _exec_with_retry(self, fn, retries: int = 3, sleep_sec: float = 0.05):
+        last_err = None
+        for _ in range(retries):
+            try:
+                return fn()
+            except sqlite3.OperationalError as err:
+                last_err = err
+                if "locked" not in str(err).lower():
+                    raise
+                time.sleep(sleep_sec)
+        if last_err:
+            raise last_err
+
+    def log(
+        self,
+        game_id: str,
+        phase_no: int,
+        phase: str,
+        actor_id: str | None,
+        event_type: str,
+        payload: dict,
+        room_id: str | None = None,
+        action_seq: int | None = None,
+    ) -> None:
+        def _write():
+            with self._conn() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO event_log (game_id, room_id, phase_no, phase, action_seq, actor_id, event_type, payload_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    (
+                        game_id,
+                        room_id,
+                        phase_no,
+                        phase,
+                        action_seq,
+                        actor_id,
+                        event_type,
+                        json.dumps(payload, ensure_ascii=False),
+                    ),
+                )
+
+        self._exec_with_retry(_write)
+
+    def save_summary(self, game_id: str, survivors_text: str, finish_reason: str, room_id: str | None = None) -> None:
+        def _write():
+            with self._conn() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO game_summary (game_id, room_id, winner_text, survivors_text, finish_reason)
+                    VALUES (?, ?, ?, ?, ?);
+                    """,
+                    (game_id, room_id, survivors_text, survivors_text, finish_reason),
+                )
+
+        self._exec_with_retry(_write)

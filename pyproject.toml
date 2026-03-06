@@ -7,8 +7,8 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.scripts]
-survival-host = "game.net_host:run_host_server"
-survival-client = "game.net_client:run_client"
+survival-broker = "game.broker_server:run_broker_server"
+survival = "game.net_client:run_client"
 
 [tool.setuptools]
 packages = ["game"]

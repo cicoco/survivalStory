@@ -42,6 +42,7 @@ class AgentRuntime:
         self.user_template = Path(settings.user_prompt_file).read_text(encoding="utf-8")
         self.client = OpenAIClient(
             base_url=settings.base_url,
+            chat_path=settings.chat_path,
             api_key=settings.api_key,
             model=settings.model,
             timeout_sec=settings.timeout_sec,

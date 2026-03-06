@@ -63,35 +63,51 @@
 ---
 
 ## 4.1 房间与开局机制（Lobby）
-- 支持房主创建房间（生成`room_id`）。
-- 支持真人玩家加入房间（房间总人数上限6）。
+- 所有玩家使用统一客户端 `survival`。
+- 客户端支持大厅命令：`list / create [max_players] [max_ai] / join <room_id> / start`。
+- `create` 创建房间并自动加入；创建者为房主。
+- 房间最大人数由创建命令参数指定（`max_players`）。
+- 房间最大AI数由创建命令参数指定（`max_ai`）。
 - 仅房主可执行`start`开始游戏。
-- 开始游戏时，若真人人数不足6，系统自动补AI到6人。
+- 开始游戏时，系统按`max_players`与`max_ai`共同约束补AI：
+  - AI数不超过`max_ai`
+  - 总人数不超过`max_players`
 - 游戏开始后房间状态置为`started`，不再允许新玩家加入当前对局。
 
 ### 联机运行模式（V1）
-- `survival-host`：房主进程，负责开房、Lobby、开局、规则结算。
-- `survival-client`：远端玩家进程，通过`host/port/room_id/name`加入。
+- `survival-broker`：房间发现中介（不参与对局结算）。
+- `survival`：统一玩家客户端，通过`broker_host/broker_port/name`连接大厅。
+- 房主客户端本地启动房间服务并托管对局权威结算。
 - 通信协议：TCP + JSON 行协议（一行一条消息）。
 - 远端玩家超时未提交动作时，服务端自动执行`rest`。
-- `survival-host`启动时要求`--name`，该名字直接作为房主玩家进入房间。
-- `survival-client`启动时也要求`--name`，该名字作为客户端玩家身份加入房间。
+- `survival`启动时要求`--name`，该名字作为玩家身份。
 - OpenAI连接参数从`config/openai.json`或`SURVIVAL_OPENAI_*`环境变量读取。
+- OpenAI接口地址拆分为`base_url + chat_path`，适配不同路由前缀（如`/chat/completions`或`/v1/chat/completions`）。
 - 提示词拆分为`system_prompt_file`与`user_prompt_file`，两者均支持模板关键词替换（如`{{player_name}}`、`{{water}}`、`{{current_situation}}`）。
+- 游戏开始后所有终端可并发提交动作，服务端按收到顺序（first-come）结算并分配`action_seq`。
 
-### 房主与客户端职责
-- 房主（权威）：维护唯一房间状态，执行规则校验与结算。
-- 客户端：只负责输入动作命令，不直接改状态。
-- 事件广播：房主把动作结果/结算结果广播给所有客户端。
+### 服务端与客户端职责
+- 服务端（权威）：维护房间状态，执行规则校验与结算。
+- 客户端：发送大厅命令与动作命令，不直接改状态。
+- 事件广播：服务端向房间内所有客户端广播动作结果/结算结果。
 
 ### JSON 行协议（当前）
-客户端 -> 房主：
+客户端 -> 服务端：
+- `{"type":"list"}`
+- `{"type":"create","name":"玩家A","max_players":8,"max_ai":5,"endpoint_host":"1.2.3.4","endpoint_port":10023}`
 - `{"type":"join","room_id":"Z9NEGO","name":"玩家B"}`
+- `{"type":"start"}`
+- `{"type":"members"}`
 - `{"type":"action","text":"move 2 3"}`
 
-房主 -> 客户端：
+服务端 -> 客户端：
+- `{"type":"rooms","rooms":[...]}`
+- `{"type":"created",...}`
 - `{"type":"joined",...}`
-- `{"type":"turn","payload":{...}}`
+- `{"type":"members","members":[...]}`
+- `{"type":"game_started","payload":{...}}`
+- `{"type":"phase_started","payload":{...}}`
+- `{"type":"state","payload":{...}}`
 - `{"type":"event","message":"..."}`
 - `{"type":"game_over","payload":{...}}`
 - `{"type":"error","message":"..."}`
@@ -104,7 +120,8 @@ survivalStory/
   main.py
   pyproject.toml
   game/
-    net_host.py
+    broker_server.py
+    room_host.py
     net_client.py
     lobby.py
     cli.py
@@ -238,12 +255,12 @@ while game_not_finished:
   mark all alive players phase_ended = false
 
   while exists alive player with phase_ended == false:
-    for each alive & not ended player:
-      if human: read command
-      if ai: decide_action()
-      apply_action_via_rule_engine()
-      if action == REST: phase_ended = true
-      if player dead: phase_ended = true
+    receive actions from all human terminals concurrently
+    process actions in arrival order (action_seq++)
+    periodically let alive AI submit actions
+    apply_action_via_rule_engine()
+    if action == REST: phase_ended = true
+    if player dead: phase_ended = true
 
   settle_phase_once():
     apply_fixed_cost(water-1, food-1) to alive players
@@ -278,8 +295,8 @@ while game_not_finished:
 - 本步动作结果
 
 联机补充：
-- 房主 Lobby 命令：`members | start | help`
-- 客户端通过命令行参数加入，不在 Lobby 输入 `join`
+- 客户端大厅命令：`list | create [max_players] [max_ai] | join <room_id> | start | members`
+- 开局后所有客户端可并发提交动作
 
 ---
 

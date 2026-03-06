@@ -9,6 +9,7 @@ from pathlib import Path
 @dataclass
 class OpenAISettings:
     base_url: str
+    chat_path: str
     api_key: str
     model: str
     timeout_sec: int
@@ -24,12 +25,13 @@ class OpenAISettings:
             data = json.loads(p.read_text(encoding="utf-8"))
 
         base_url = os.getenv("SURVIVAL_OPENAI_BASE_URL", data.get("base_url", "")).strip()
+        chat_path = os.getenv("SURVIVAL_OPENAI_CHAT_PATH", data.get("chat_path", "/chat/completions")).strip()
         api_key = os.getenv("SURVIVAL_OPENAI_API_KEY", data.get("api_key", "")).strip()
         model = os.getenv("SURVIVAL_OPENAI_MODEL", data.get("model", "gpt-4o-mini")).strip()
         timeout_sec = int(os.getenv("SURVIVAL_OPENAI_TIMEOUT_SEC", str(data.get("timeout_sec", 30))))
         system_prompt_file = os.getenv(
             "SURVIVAL_AI_SYSTEM_PROMPT_FILE",
-            data.get("system_prompt_file", data.get("prompt_file", "AI提示词.md")),
+            data.get("system_prompt_file", data.get("prompt_file", "config/prompts/system_prompt.md")),
         ).strip()
         user_prompt_file = os.getenv(
             "SURVIVAL_AI_USER_PROMPT_FILE",
@@ -39,9 +41,12 @@ class OpenAISettings:
 
         if not base_url or not api_key:
             raise ValueError("missing_openai_config: base_url/api_key required")
+        if not chat_path.startswith("/"):
+            chat_path = "/" + chat_path
 
         return cls(
             base_url=base_url.rstrip("/"),
+            chat_path=chat_path,
             api_key=api_key,
             model=model,
             timeout_sec=timeout_sec,

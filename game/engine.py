@@ -4,7 +4,7 @@ import random
 import uuid
 
 from game.agents.runtime import AgentRuntime, load_agent_configs
-from game.constants import MAP_GRID, MAX_ACTIONS_PER_PHASE, ROOM_SIZE, START_EXPOSURE, START_FOOD, START_WATER
+from game.constants import DEFAULT_ROOM_SIZE, MAP_GRID, MAX_ACTIONS_PER_PHASE, START_EXPOSURE, START_FOOD, START_WATER
 from game.memory.service import MemoryService
 from game.models import Action, ActionKind, PlayerState, RoomState
 from game.rules import apply_action, check_death, init_building_loot, settle_phase
@@ -37,7 +37,15 @@ class GameEngine:
         room_id: str = "room-1",
         event_callback=None,
         settings: OpenAISettings | None = None,
+        max_players: int = DEFAULT_ROOM_SIZE,
+        max_ai: int | None = None,
     ) -> "GameEngine":
+        if max_players < len(human_names):
+            raise ValueError("max_players_less_than_humans")
+        max_ai = max_players if max_ai is None else max_ai
+        if max_ai < 0:
+            raise ValueError("max_ai_negative")
+
         positions = _safe_positions()
         random.shuffle(positions)
 
@@ -57,7 +65,7 @@ class GameEngine:
                 )
             )
 
-        ai_count = ROOM_SIZE - len(players)
+        ai_count = min(max_players - len(players), max_ai)
         ai_ids = []
         for i in range(ai_count):
             x, y = positions.pop()
@@ -97,6 +105,14 @@ class GameEngine:
     def is_phase_done(self) -> bool:
         alive = [p for p in self.room.players if p.alive]
         return all(p.phase_ended for p in alive)
+
+    def start_phase(self) -> None:
+        self.room.phase_action_seq = 0
+        for p in self.room.players:
+            if p.alive:
+                p.phase_ended = False
+                p.take_locked_in_phase = False
+                p.phase_actions_used = 0
 
     def apply_and_log(self, actor: PlayerState, action: Action) -> tuple[bool, str]:
         action_seq = self.room.phase_action_seq + 1
@@ -154,12 +170,7 @@ class GameEngine:
         return True, ""
 
     def run_phase(self, human_action_provider) -> None:
-        self.room.phase_action_seq = 0
-        for p in self.room.players:
-            if p.alive:
-                p.phase_ended = False
-                p.take_locked_in_phase = False
-                p.phase_actions_used = 0
+        self.start_phase()
 
         while not self.room.finished and not self.is_phase_done():
             for p in self.room.players:
@@ -181,9 +192,11 @@ class GameEngine:
                         fallback = Action(player_id=p.player_id, kind=ActionKind.REST, source="AI", reason="invalid_fallback")
                         self.apply_and_log(p, fallback)
 
+        self.settle_current_phase()
+
+    def settle_current_phase(self) -> None:
         if self.room.finished:
             return
-
         settle_phase_no = self.room.phase_no
         settle_phase_name = self.room.phase.value
         settle = settle_phase(self.room)
