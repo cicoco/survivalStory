@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import secrets
 import socketserver
 import string
 import threading
@@ -10,6 +11,7 @@ import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 
 def _send_json(file_obj, payload: dict) -> None:
@@ -28,6 +30,9 @@ class BrokerState:
             if room_id not in self.rooms:
                 return room_id
 
+    def _new_room_token(self) -> str:
+        return secrets.token_urlsafe(18)
+
     def create_room(self, host_name: str, max_players: int, max_ai: int, endpoint_host: str, endpoint_port: int) -> dict:
         if max_players < 1:
             raise ValueError("invalid_max_players")
@@ -39,6 +44,7 @@ class BrokerState:
         now = time.time()
         room = {
             "room_id": room_id,
+            "room_token": self._new_room_token(),
             "host_name": host_name,
             "max_players": max_players,
             "max_ai": max_ai,
@@ -57,15 +63,18 @@ class BrokerState:
     def heartbeat(
         self,
         room_id: str,
+        room_token: str,
         status: str | None = None,
         max_players: int | None = None,
         human_players: int | None = None,
         watcher_count: int | None = None,
-    ) -> dict | None:
+    ) -> dict:
         with self.lock:
             room = self.rooms.get(room_id)
             if not room:
-                return None
+                raise KeyError("room_not_found")
+            if room.get("room_token") != room_token:
+                raise PermissionError("unauthorized")
             room["last_heartbeat_at"] = time.time()
             if status in {"WAITING", "RUNNING"}:
                 room["status"] = status
@@ -77,18 +86,48 @@ class BrokerState:
                 room["watcher_count"] = watcher_count
             return room
 
-    def remove_room(self, room_id: str) -> None:
+    def remove_room(self, room_id: str, room_token: str) -> None:
         with self.lock:
+            room = self.rooms.get(room_id)
+            if not room:
+                raise KeyError("room_not_found")
+            if room.get("room_token") != room_token:
+                raise PermissionError("unauthorized")
             self.rooms.pop(room_id, None)
 
-    def list_rooms(self) -> list[dict]:
-        cutoff = time.time() - 30.0
+    def cleanup_stale(self, ttl_sec: float = 30.0) -> int:
+        cutoff = time.time() - ttl_sec
+        removed = 0
         with self.lock:
             stale = [rid for rid, r in self.rooms.items() if r.get("last_heartbeat_at", 0) < cutoff]
             for rid in stale:
                 self.rooms.pop(rid, None)
+                removed += 1
+        return removed
+
+    def list_rooms(
+        self,
+        offset: int = 0,
+        limit: int = 20,
+        status: str | None = None,
+    ) -> tuple[list[dict], int]:
+        if offset < 0:
+            offset = 0
+        if limit <= 0:
+            limit = 20
+        if limit > 200:
+            limit = 200
+        status_filter = (status or "").strip().upper()
+        if status_filter not in {"WAITING", "RUNNING"}:
+            status_filter = ""
+        with self.lock:
             rooms = list(self.rooms.values())
-        return [
+        rooms.sort(key=lambda x: float(x.get("created_at", 0.0)), reverse=True)
+        if status_filter:
+            rooms = [r for r in rooms if str(r.get("status", "WAITING")).upper() == status_filter]
+        total = len(rooms)
+        sliced = rooms[offset : offset + limit]
+        return ([
             {
                 "room_id": r["room_id"],
                 "host_name": r["host_name"],
@@ -100,8 +139,8 @@ class BrokerState:
                 "endpoint_port": r["endpoint_port"],
                 "status": r.get("status", "WAITING"),
             }
-            for r in rooms
-        ]
+            for r in sliced
+        ], total)
 
     def lookup(self, room_id: str) -> dict | None:
         with self.lock:
@@ -136,7 +175,25 @@ class Handler(socketserver.StreamRequestHandler):
             mtype = msg.get("type")
 
             if mtype == "list":
-                _send_json(self.wfile, {"type": "rooms", "rooms": state.list_rooms()})
+                page = msg.get("page")
+                page_size = msg.get("page_size")
+                status = str(msg.get("status", "")).strip().upper()
+                page_i = int(page) if isinstance(page, int) and page > 0 else 1
+                size_i = int(page_size) if isinstance(page_size, int) and page_size > 0 else 20
+                offset = (page_i - 1) * size_i
+                rooms, total = state.list_rooms(offset=offset, limit=size_i, status=status or None)
+                total_pages = (total + size_i - 1) // size_i if size_i > 0 else 1
+                _send_json(
+                    self.wfile,
+                    {
+                        "type": "rooms",
+                        "rooms": rooms,
+                        "page": page_i,
+                        "page_size": size_i,
+                        "total": total,
+                        "total_pages": total_pages,
+                    },
+                )
                 continue
 
             if mtype == "create":
@@ -165,19 +222,28 @@ class Handler(socketserver.StreamRequestHandler):
 
             if mtype == "heartbeat":
                 room_id = str(msg.get("room_id", "")).strip()
+                room_token = str(msg.get("room_token", "")).strip()
                 status = str(msg.get("status", "")).strip().upper()
                 max_players = msg.get("max_players")
                 human_players = msg.get("human_players")
                 watcher_count = msg.get("watcher_count")
-                room = state.heartbeat(
-                    room_id,
-                    status=status or None,
-                    max_players=int(max_players) if isinstance(max_players, int) else None,
-                    human_players=int(human_players) if isinstance(human_players, int) else None,
-                    watcher_count=int(watcher_count) if isinstance(watcher_count, int) else None,
-                )
-                if not room:
+                if not room_token:
+                    _send_json(self.wfile, {"type": "error", "message": "room_token_required"})
+                    continue
+                try:
+                    room = state.heartbeat(
+                        room_id,
+                        room_token=room_token,
+                        status=status or None,
+                        max_players=int(max_players) if isinstance(max_players, int) else None,
+                        human_players=int(human_players) if isinstance(human_players, int) else None,
+                        watcher_count=int(watcher_count) if isinstance(watcher_count, int) else None,
+                    )
+                except KeyError:
                     _send_json(self.wfile, {"type": "error", "message": "room_not_found"})
+                    continue
+                except PermissionError:
+                    _send_json(self.wfile, {"type": "error", "message": "unauthorized"})
                     continue
                 _send_json(
                     self.wfile,
@@ -194,7 +260,18 @@ class Handler(socketserver.StreamRequestHandler):
 
             if mtype == "remove":
                 room_id = str(msg.get("room_id", "")).strip()
-                state.remove_room(room_id)
+                room_token = str(msg.get("room_token", "")).strip()
+                if not room_token:
+                    _send_json(self.wfile, {"type": "error", "message": "room_token_required"})
+                    continue
+                try:
+                    state.remove_room(room_id, room_token=room_token)
+                except KeyError:
+                    _send_json(self.wfile, {"type": "error", "message": "room_not_found"})
+                    continue
+                except PermissionError:
+                    _send_json(self.wfile, {"type": "error", "message": "unauthorized"})
+                    continue
                 _send_json(self.wfile, {"type": "removed", "room_id": room_id})
                 continue
 
@@ -238,7 +315,10 @@ class LobbyHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         state: BrokerState = self.server.state  # type: ignore[attr-defined]
-        if self.path == "/":
+        parsed = urlparse(self.path)
+        path = parsed.path
+        qs = parse_qs(parsed.query or "")
+        if path == "/":
             use_cache = not bool(getattr(self.server, "dev_web", False))
             html_body = _lobby_html(use_cache=use_cache).encode("utf-8")
             self.send_response(HTTPStatus.OK)
@@ -247,8 +327,33 @@ class LobbyHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(html_body)
             return
-        if self.path == "/api/rooms":
-            self._send_json({"rooms": state.list_rooms(), "ts": time.time()})
+        if path == "/api/rooms":
+            try:
+                page = int((qs.get("page") or ["1"])[0])
+            except Exception:
+                page = 1
+            try:
+                page_size = int((qs.get("page_size") or ["20"])[0])
+            except Exception:
+                page_size = 20
+            status = str((qs.get("status") or [""])[0]).strip().upper()
+            if page <= 0:
+                page = 1
+            if page_size <= 0:
+                page_size = 20
+            offset = (page - 1) * page_size
+            rooms, total = state.list_rooms(offset=offset, limit=page_size, status=status or None)
+            total_pages = (total + page_size - 1) // page_size if page_size > 0 else 1
+            self._send_json(
+                {
+                    "rooms": rooms,
+                    "ts": time.time(),
+                    "page": page,
+                    "page_size": page_size,
+                    "total": total,
+                    "total_pages": total_pages,
+                }
+            )
             return
         self._send_json({"type": "error", "message": "not_found"}, status=404)
 
@@ -276,6 +381,12 @@ def run_broker_server() -> None:
 
     state = BrokerState()
     tcp_server = ThreadedTCPServer((args.bind, args.port), Handler, state)
+    stop_gc = threading.Event()
+    gc_thread = threading.Thread(
+        target=lambda: _run_gc_loop(state, stop_gc, ttl_sec=54.0, interval_sec=10.0),
+        daemon=True,
+    )
+    gc_thread.start()
     web_server = None
     web_thread = None
     if args.web_port > 0:
@@ -289,11 +400,21 @@ def run_broker_server() -> None:
     try:
         tcp_server.serve_forever()
     finally:
+        stop_gc.set()
         tcp_server.shutdown()
         tcp_server.server_close()
         if web_server is not None:
             web_server.shutdown()
             web_server.server_close()
+
+
+def _run_gc_loop(state: BrokerState, stop_event: threading.Event, ttl_sec: float, interval_sec: float) -> None:
+    while not stop_event.is_set():
+        try:
+            state.cleanup_stale(ttl_sec=ttl_sec)
+        except Exception:
+            pass
+        stop_event.wait(interval_sec)
 
 
 if __name__ == "__main__":

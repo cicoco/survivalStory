@@ -25,9 +25,11 @@ uv run survival --broker-host <broker_ip> --broker-port 9010 --name 玩家A
 客户端会默认启动本地控制 API：`http://127.0.0.1:17890`（用于网页 Join/Create/Start/状态查询绑定）。
 本地接口：`GET /me`、`GET /room`、`GET /events`（SSE 事件流）、`GET /host`、`GET /game`、`POST /join`、`POST /create`、`POST /start`、`POST /leave`、`POST /action`、`POST /members`。
 
+协议提示：broker 与 client 需使用同一版本（`heartbeat/remove` 需要 `room_token`），升级后请同时重启 broker 与所有客户端。
+
 ## 3. 客户端命令
 ### 3.1 大厅命令
-- `list`：查看房间列表（含状态：`等待中` / `游戏中`）
+- `list [page] [page_size] [status]`：分页查看房间列表（状态可选 `WAITING` / `RUNNING`）
 - `create [max_players] [max_ai]`：创建房间并成为房主（自动加入）
 - `join <room_id>`：加入房间
 - `watch <room_id>`：观察房间事件（直连房主，实时推送）
@@ -170,6 +172,11 @@ cp config/openai.json.example config/openai.json
   - `--dev-web`：开发模式，关闭本地页面模板缓存（`/game`、`/host`）。
   - `--console`：开启终端交互模式；默认是网页优先模式。
 
+信令与房间存活参数（默认）：
+- 房主心跳上报间隔：12 秒
+- broker 房间过期 TTL：54 秒
+- broker 过期清理扫描间隔：10 秒
+
 ### 7.1 推荐启动示例
 1. 本机开发（Broker + 网页大厅）：
 ```bash
@@ -186,7 +193,20 @@ uv run survival --broker-host 127.0.0.1 --broker-port 9010 --name A --control-po
 uv run survival --broker-host 127.0.0.1 --broker-port 9010 --name B --control-port 17891 --dev-web
 ```
 
-## 8. SQLite 字段说明
+大厅分页说明：
+- 网页大厅 `/api/rooms` 支持 `page` 与 `page_size` 参数。
+- 页面默认每页 20 条，可通过“上一页/下一页”切换。
+
+## 8. 前端贴图资源（正视角）
+游戏页会从 `game/web/assets/tiles/` 读取以下文件：
+- `Q.png`：墙/不可进入区域
+- `X.png`：危险区域
+- `J.png`、`B.png`、`S.png`、`W.png`、`M.png`：建筑地块
+
+建议：
+- 使用正视角统一风格，推荐同尺寸 PNG（例如 `64x64` 或 `96x96`）。
+
+## 9. SQLite 字段说明
 数据库：`game.db`
 
 ### `event_log`

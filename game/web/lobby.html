@@ -126,6 +126,19 @@
       align-items: center;
     }
     .msg.error { border-color: #e4b4b0; background: #fff5f4; color: var(--danger); }
+    .pager {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .pager button {
+      height: 30px;
+      padding: 0 10px;
+    }
 
     @media (max-width: 940px) { .top-grid { grid-template-columns: 1fr; } }
   </style>
@@ -220,6 +233,13 @@
         </table>
       </div>
       <div class="body" style="padding-top:0;">
+        <div class="pager">
+          <button id="prevPageBtn" class="btn-refresh" onclick="prevPage()">上一页</button>
+          <span id="pageInfo">第 1 / 1 页</span>
+          <button id="nextPageBtn" class="btn-refresh" onclick="nextPage()">下一页</button>
+        </div>
+      </div>
+      <div class="body" style="padding-top:0;">
         <div id="msg" class="msg">就绪。</div>
       </div>
     </section>
@@ -230,6 +250,12 @@
     let mePollTimer = null;
     let lastCtlBase = "";
     let ctlChangeTimer = null;
+    let meRefreshTimer = null;
+    let meRefreshInFlight = false;
+    let meRefreshQueued = false;
+    let roomPage = 1;
+    const roomPageSize = 20;
+    let roomTotalPages = 1;
 
     function statusCn(v){ return (v || "WAITING") === "RUNNING" ? "游戏中" : "等待中"; }
     function statusClass(v){ return (v || "WAITING") === "RUNNING" ? "status-running" : "status-waiting"; }
@@ -315,6 +341,11 @@
     }
 
     async function refreshMe(){
+      if (meRefreshInFlight) {
+        meRefreshQueued = true;
+        return;
+      }
+      meRefreshInFlight = true;
       const base = document.getElementById("ctl").value.replace(/\/$/, "");
       if (base && base !== lastCtlBase) {
         lastCtlBase = base;
@@ -360,6 +391,12 @@
         applyJoinButtonState();
       } catch (err) {
         setMsg("状态查询失败: " + err.message, true);
+      } finally {
+        meRefreshInFlight = false;
+        if (meRefreshQueued) {
+          meRefreshQueued = false;
+          setTimeout(() => refreshMe(), 150);
+        }
       }
     }
 
@@ -384,14 +421,19 @@
 
     async function refreshRooms(){
       try {
-        const resp = await fetch("/api/rooms");
+        const resp = await fetch(`/api/rooms?page=${roomPage}&page_size=${roomPageSize}`);
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.message || ("HTTP " + resp.status));
         const list = data.rooms || [];
+        roomTotalPages = Math.max(1, Number(data.total_pages || 1));
+        roomPage = Math.max(1, Math.min(roomPage, roomTotalPages));
+        document.getElementById("pageInfo").textContent = `第 ${roomPage} / ${roomTotalPages} 页`;
+        document.getElementById("prevPageBtn").disabled = roomPage <= 1;
+        document.getElementById("nextPageBtn").disabled = roomPage >= roomTotalPages;
         const tbody = document.getElementById("rooms");
         if (!list.length) {
           tbody.innerHTML = '<tr><td colspan="5">暂无房间</td></tr>';
-          setMsg("房间列表已刷新：暂无房间。", false);
+          setMsg(`房间列表已刷新：第 ${roomPage}/${roomTotalPages} 页暂无房间。`, false);
           return;
         }
         tbody.innerHTML = list.map(r => {
@@ -410,10 +452,20 @@
           </tr>`;
         }).join("");
         applyJoinButtonState();
-        setMsg("房间列表已刷新。", false);
+        setMsg(`房间列表已刷新：第 ${roomPage}/${roomTotalPages} 页。`, false);
       } catch (err) {
         setMsg("刷新失败: " + err.message, true);
       }
+    }
+    function prevPage(){
+      if (roomPage <= 1) return;
+      roomPage -= 1;
+      refreshRooms();
+    }
+    function nextPage(){
+      if (roomPage >= roomTotalPages) return;
+      roomPage += 1;
+      refreshRooms();
     }
 
     async function joinRoom(roomId){
@@ -480,9 +532,13 @@
     }
 
     function scheduleMeRefresh(){
-      setTimeout(refreshMe, 300);
-      setTimeout(refreshMe, 900);
-      setTimeout(refreshMe, 1800);
+      if (meRefreshTimer !== null) {
+        clearTimeout(meRefreshTimer);
+      }
+      meRefreshTimer = setTimeout(() => {
+        meRefreshTimer = null;
+        refreshMe();
+      }, 500);
     }
 
     document.addEventListener("DOMContentLoaded", () => {

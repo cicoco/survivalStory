@@ -78,13 +78,14 @@ def _print_state(payload: dict, self_name: str) -> None:
 def _print_lobby_help() -> None:
     print("")
     print("=== 大厅命令 ===")
-    print("- list")
+    print("- list [page] [page_size] [status]")
     print("- create [max_players] [max_ai]")
     print("- join <room_id>")
     print("- watch <room_id>")
     print("- me                  # 查询当前客户端状态")
     print("- help")
     print("- quit")
+    print("示例: list 1 20 WAITING")
     print("示例: create 6 2")
     print("示例: watch ABC123")
     print("")
@@ -163,6 +164,9 @@ class _LocalControlHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         qs = parse_qs(parsed.query or "")
+        if path.startswith("/assets/"):
+            self._serve_asset(path)
+            return
         if path == "/health":
             self._send_json({"ok": True, "busy": state.is_busy()})
             return
@@ -225,6 +229,41 @@ class _LocalControlHandler(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
         self._send_json({"ok": False, "message": "not_found"}, status=404)
+
+    def _serve_asset(self, request_path: str) -> None:
+        web_root = (Path(__file__).resolve().parent / "web").resolve()
+        rel = request_path.lstrip("/")
+        target = (web_root / rel).resolve()
+        try:
+            target.relative_to(web_root)
+        except ValueError:
+            self._send_json({"ok": False, "message": "not_found"}, status=404)
+            return
+        if (not target.exists()) or (not target.is_file()):
+            self._send_json({"ok": False, "message": "not_found"}, status=404)
+            return
+        content_type = "application/octet-stream"
+        suffix = target.suffix.lower()
+        if suffix == ".png":
+            content_type = "image/png"
+        elif suffix in {".jpg", ".jpeg"}:
+            content_type = "image/jpeg"
+        elif suffix == ".webp":
+            content_type = "image/webp"
+        elif suffix == ".svg":
+            content_type = "image/svg+xml"
+        elif suffix == ".css":
+            content_type = "text/css; charset=utf-8"
+        elif suffix == ".js":
+            content_type = "application/javascript; charset=utf-8"
+        body = target.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_POST(self) -> None:
         state: _LocalControlState = self.server.control_state  # type: ignore[attr-defined]
@@ -371,10 +410,13 @@ def _start_heartbeat(
     broker_host: str,
     broker_port: int,
     room_id: str,
+    room_token: str,
     stop_event: threading.Event,
     status_provider: Callable[[], str],
     room_stats_provider: Callable[[], dict],
 ) -> threading.Thread:
+    heartbeat_interval_sec = 12.0
+
     def _loop() -> None:
         while not stop_event.is_set():
             try:
@@ -384,6 +426,7 @@ def _start_heartbeat(
                 payload = {
                     "type": "heartbeat",
                     "room_id": room_id,
+                    "room_token": room_token,
                     "status": status_provider(),
                 }
                 payload.update(stats)
@@ -393,7 +436,7 @@ def _start_heartbeat(
                 s.close()
             except Exception:
                 pass
-            stop_event.wait(5.0)
+            stop_event.wait(heartbeat_interval_sec)
 
     t = threading.Thread(target=_loop, daemon=True)
     t.start()
@@ -880,14 +923,15 @@ def _teardown_hosted_room(
     broker_host: str,
     broker_port: int,
     hosted_room_id: str,
+    hosted_room_token: str,
     hosted_server: RoomHostServer | None,
     hb_stop: threading.Event,
-) -> tuple[str, RoomHostServer | None]:
-    if hosted_room_id:
+) -> tuple[str, str, RoomHostServer | None]:
+    if hosted_room_id and hosted_room_token:
         try:
             s = socket.create_connection((broker_host, broker_port), timeout=2)
             f = s.makefile("r", encoding="utf-8")
-            _send_json(s, {"type": "remove", "room_id": hosted_room_id})
+            _send_json(s, {"type": "remove", "room_id": hosted_room_id, "room_token": hosted_room_token})
             _recv_one(f)
             f.close()
             s.close()
@@ -896,7 +940,7 @@ def _teardown_hosted_room(
     hb_stop.set()
     if hosted_server is not None:
         hosted_server.stop()
-    return "", None
+    return "", "", None
 
 
 def _poll_lobby_command(api_queue: Queue[str]) -> tuple[str, str]:
@@ -948,6 +992,7 @@ def run_client() -> None:
 
     hosted_server: RoomHostServer | None = None
     hosted_room_id = ""
+    hosted_room_token = ""
     hb_stop = threading.Event()
     heartbeat_thread = None
     in_room_lock = threading.Lock()
@@ -1059,12 +1104,28 @@ def run_client() -> None:
             continue
 
         if op == "list":
+            page = 1
+            page_size = 20
+            status = ""
+            if len(parts) >= 2 and parts[1].isdigit():
+                page = max(1, int(parts[1]))
+            if len(parts) >= 3 and parts[2].isdigit():
+                page_size = max(1, int(parts[2]))
+            if len(parts) >= 4:
+                status = parts[3].strip().upper()
             s = socket.create_connection((args.broker_host, args.broker_port))
             f = s.makefile("r", encoding="utf-8")
-            _send_json(s, {"type": "list"})
+            payload = {"type": "list", "page": page, "page_size": page_size}
+            if status in {"WAITING", "RUNNING"}:
+                payload["status"] = status
+            _send_json(s, payload)
             msg = _recv_one(f)
             if msg.get("type") == "rooms":
                 _print_rooms(msg.get("rooms", []))
+                print(
+                    f"[分页] page={msg.get('page', page)} size={msg.get('page_size', page_size)} "
+                    f"total={msg.get('total', 0)} total_pages={msg.get('total_pages', 0)}"
+                )
             else:
                 print(f"[错误] {msg.get('message')}")
             f.close()
@@ -1131,6 +1192,15 @@ def run_client() -> None:
 
             room = msg.get("room", {})
             hosted_room_id = room.get("room_id")
+            hosted_room_token = str(room.get("room_token", ""))
+            if not hosted_room_token:
+                print("[错误] broker 未返回 room_token，创建失败。")
+                hosted_server.stop()
+                hosted_server = None
+                hosted_room_id = ""
+                f.close()
+                s.close()
+                continue
             # update runtime room_id for join checks
             hosted_server.runtime.room_id = hosted_room_id
             print(f"[创建成功] 房间号: {hosted_room_id}, 地址: {endpoint_host}:{endpoint_port}, max={max_players}, max_ai={max_ai}")
@@ -1141,6 +1211,7 @@ def run_client() -> None:
                 args.broker_host,
                 args.broker_port,
                 hosted_room_id,
+                hosted_room_token,
                 hb_stop,
                 status_provider=lambda: "RUNNING" if (hosted_server and hosted_server.runtime.running) else "WAITING",
                 room_stats_provider=lambda: {
@@ -1215,10 +1286,11 @@ def run_client() -> None:
                     }
                 )
             event_bus.publish({"type": "state", "snapshot": _snapshot()})
-            hosted_room_id, hosted_server = _teardown_hosted_room(
+            hosted_room_id, hosted_room_token, hosted_server = _teardown_hosted_room(
                 args.broker_host,
                 args.broker_port,
                 hosted_room_id,
+                hosted_room_token,
                 hosted_server,
                 hb_stop,
             )
@@ -1314,10 +1386,11 @@ def run_client() -> None:
 
         print("[错误] 未知命令。输入 help 查看可用命令。")
 
-    hosted_room_id, hosted_server = _teardown_hosted_room(
+    hosted_room_id, hosted_room_token, hosted_server = _teardown_hosted_room(
         args.broker_host,
         args.broker_port,
         hosted_room_id,
+        hosted_room_token,
         hosted_server,
         hb_stop,
     )

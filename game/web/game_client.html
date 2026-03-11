@@ -47,27 +47,51 @@
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .map {
       display: grid;
-      grid-template-columns: repeat(9, 1fr);
+      grid-template-columns: repeat(9, minmax(0, 1fr));
       gap: 4px;
     }
     .cell {
-      height: 42px;
+      aspect-ratio: 1 / 1;
+      min-height: 44px;
       border-radius: 6px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 12px;
       font-weight: 700;
+      color: rgba(255,255,255,0.92);
+      text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+      background-size: cover;
+      background-position: center;
+      box-shadow: inset 0 -8px 12px rgba(0,0,0,0.14);
     }
-    .tile-q { background: var(--q); }
-    .tile-x { background: var(--x); }
-    .tile-safe { background: var(--safe); }
+    .tile-label {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      right: 4px;
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-size: 11px;
+      line-height: 1.2;
+      text-align: center;
+      background: rgba(13, 22, 31, 0.72);
+      color: #e9f3fb;
+      border: 1px solid rgba(255,255,255,0.18);
+      pointer-events: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tile-q { background-color: var(--q); }
+    .tile-x { background-color: var(--x); }
+    .tile-safe { background-color: var(--safe); }
     .cell.me {
-      outline: 3px solid var(--me);
-      outline-offset: -2px;
+      box-shadow: 0 0 0 3px rgba(242,214,107,0.95), inset 0 -8px 12px rgba(0,0,0,0.14);
       color: #1f1705;
-      background-image: radial-gradient(circle at center, rgba(242,214,107,.9) 0 48%, transparent 50%);
+      background-image: radial-gradient(circle at center, rgba(242,214,107,.95) 0 46%, transparent 47%);
     }
     .actions {
       display: grid;
@@ -178,6 +202,22 @@
       ["Q","X","X","X","J","B","X","B","Q"],
       ["Q","Q","Q","Q","Q","Q","Q","Q","Q"]
     ];
+    const TILE_ASSETS = {
+      "Q": "/assets/tiles/Q.png",
+      "X": "/assets/tiles/X.png",
+      "J": "/assets/tiles/J.png",
+      "B": "/assets/tiles/B.png",
+      "S": "/assets/tiles/S.png",
+      "W": "/assets/tiles/W.png",
+      "M": "/assets/tiles/M.png"
+    };
+    const TILE_ZH_LABEL = {
+      "J": "居民楼",
+      "B": "办公楼",
+      "M": "药店",
+      "S": "超市",
+      "W": "水源"
+    };
     let latestState = null;
     const historyItems = [];
     function setMsg(t){ document.getElementById("msg").textContent = t; }
@@ -220,7 +260,20 @@
           const t = MAP[y-1][x-1];
           const el = document.createElement("div");
           el.className = "cell " + tileCls(t) + ((x === px && y === py) ? " me" : "");
-          el.textContent = t;
+          const asset = TILE_ASSETS[t];
+          if (asset) {
+            el.style.backgroundImage = `url(${asset})`;
+            el.textContent = "";
+          } else {
+            el.textContent = t;
+          }
+          const zh = TILE_ZH_LABEL[t];
+          if (zh) {
+            const lab = document.createElement("div");
+            lab.className = "tile-label";
+            lab.textContent = zh;
+            el.appendChild(lab);
+          }
           map.appendChild(el);
         }
       }
