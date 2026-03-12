@@ -11,6 +11,11 @@ short_desc: "一句话说明这个技能解决什么问题。"
 # 必填：语义化版本
 version: "1.0.0"
 
+# 这个是技能生命周期状态，用来控制是否参与路由。
+# active：正常启用，允许被选中执行
+# disabled：临时停用，不参与路由
+# deprecated：准备淘汰，默认不选（可用于兼容旧配置时告警）
+# 它的作用是：你不改代码也能开关技能、做灰度和下线管理。
 # 必填：active|disabled|deprecated
 status: "active"
 
