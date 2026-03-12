@@ -1,0 +1,38 @@
+version: "1.0.0"
+skills:
+  - skill_id: "loot_window_decision"
+    name: "Loot Window Decision"
+    short_desc: "战利品窗口下决定 GET 或 TOSS。"
+    version: "1.0.0"
+    status: "active"
+    cost_tag: "medium"
+    enabled: true
+    priority: 100
+    path: "loot_window_decision.skill.md"
+  - skill_id: "emergency_survival"
+    name: "Emergency Survival"
+    short_desc: "濒死状态下优先保命决策。"
+    version: "1.0.0"
+    status: "active"
+    cost_tag: "high"
+    enabled: true
+    priority: 90
+    path: "emergency_survival.skill.md"
+  - skill_id: "night_survival_control"
+    name: "Night Survival Control"
+    short_desc: "夜晚优先保命与风险控制。"
+    version: "1.0.0"
+    status: "active"
+    cost_tag: "low"
+    enabled: true
+    priority: 60
+    path: "night_survival_control.skill.md"
+  - skill_id: "day_explore_collect"
+    name: "Day Explore Collect"
+    short_desc: "白天优先探索与补给，避免高风险移动。"
+    version: "1.0.0"
+    status: "active"
+    cost_tag: "low"
+    enabled: true
+    priority: 40
+    path: "day_explore_collect.skill.md"
