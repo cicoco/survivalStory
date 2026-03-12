@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "game_over_summary_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "room_id",
+    "end_mode",
+    "game_over_reason",
+    "final_time_state",
+    "players",
+    "human_record",
+    "ranking"
+  ],
+  "properties": {
+    "schema": {
+      "const": "game_over_summary_v1"
+    },
+    "room_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "end_mode": {
+      "type": "string",
+      "minLength": 1
+    },
+    "game_over_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "final_time_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "day",
+        "phase",
+        "round"
+      ],
+      "properties": {
+        "day": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "phase": {
+          "type": "string",
+          "minLength": 1
+        },
+        "round": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "players": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "player_id",
+          "is_human",
+          "days_survived",
+          "resources_obtained_total",
+          "resources_obtained",
+          "death_reason",
+          "kills",
+          "deaths"
+        ],
+        "properties": {
+          "player_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "is_human": {
+            "type": "boolean"
+          },
+          "days_survived": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "resources_obtained_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "resources_obtained": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "death_reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kills": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "deaths": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "human_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "last_alive_human_player_id",
+        "alive_human_player_ids",
+        "human_survival_days",
+        "human_survival_days_max",
+        "human_kills_total",
+        "human_deaths_total"
+      ],
+      "properties": {
+        "last_alive_human_player_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "alive_human_player_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "human_survival_days": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "human_survival_days_max": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "human_kills_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "human_deaths_total": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "ranking": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rank",
+          "player_id",
+          "days_survived"
+        ],
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "player_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "days_survived": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}

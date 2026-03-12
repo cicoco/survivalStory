@@ -6,6 +6,45 @@ from typing import Final
 
 PHASE_DAY: Final[str] = "DAY"
 PHASE_NIGHT: Final[str] = "NIGHT"
+ROOM_STATUS_WAITING: Final[str] = "WAITING"
+ROOM_STATUS_IN_GAME: Final[str] = "IN_GAME"
+ROOM_STATUS_DISBANDED: Final[str] = "DISBANDED"
+ROOM_STATUS_CLOSED: Final[str] = "CLOSED"
+END_MODE_ALL_DEAD: Final[str] = "ALL_DEAD"
+END_MODE_HUMAN_ALL_DEAD: Final[str] = "HUMAN_ALL_DEAD"
+END_MODE_HOST_LEFT: Final[str] = "HOST_LEFT"
+MAX_ROOM_PLAYERS: Final[int] = 6
+MAX_TAKE_ITEMS_PER_ACTION: Final[int] = 3
+
+ACTION_MOVE: Final[str] = "MOVE"
+ACTION_EXPLORE: Final[str] = "EXPLORE"
+ACTION_USE: Final[str] = "USE"
+ACTION_TAKE: Final[str] = "TAKE"
+ACTION_REST: Final[str] = "REST"
+ACTION_ATTACK: Final[str] = "ATTACK"
+ACTION_GET: Final[str] = "GET"
+ACTION_TOSS: Final[str] = "TOSS"
+
+CORE_ACTION_TYPES: Final[frozenset[str]] = frozenset(
+    {
+        ACTION_MOVE,
+        ACTION_EXPLORE,
+        ACTION_USE,
+        ACTION_TAKE,
+        ACTION_REST,
+        ACTION_ATTACK,
+    }
+)
+FOLLOW_UP_ACTION_TYPES: Final[frozenset[str]] = frozenset({ACTION_GET, ACTION_TOSS})
+ALL_ACTION_TYPES: Final[frozenset[str]] = CORE_ACTION_TYPES | FOLLOW_UP_ACTION_TYPES
+
+LOOT_TYPE_GET: Final[str] = "GET"
+LOOT_TYPE_TOSS: Final[str] = "TOSS"
+LOOT_TYPES: Final[frozenset[str]] = frozenset({LOOT_TYPE_GET, LOOT_TYPE_TOSS})
+
+INFO_STATE_UNEXPLORED: Final[str] = "UNEXPLORED"
+INFO_STATE_SNAPSHOT: Final[str] = "SNAPSHOT"
+INFO_STATE_STALE: Final[str] = "STALE"
 
 TILE_Q: Final[str] = "Q"
 TILE_X: Final[str] = "X"
@@ -64,3 +103,7 @@ ACTION_COSTS: Final[dict[str, dict[str, int]]] = {
     "TOSS": {"water": 0, "food": 0, "exposure": 0},
 }
 
+DEATH_REASON_RESOURCE_ZERO: Final[str] = "RESOURCE_ZERO"
+DEATH_REASON_NIGHT_X_FAIL: Final[str] = "NIGHT_X_FAIL"
+DEATH_REASON_LEFT_IN_GAME: Final[str] = "LEFT_IN_GAME"
+DEATH_REASON_FATAL_TILE: Final[str] = "FATAL_TILE"

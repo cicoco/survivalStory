@@ -4,7 +4,14 @@ version = "0.1.0"
 description = "Doomsday survival strategy game server project"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "fastapi>=0.116.0",
+    "jsonschema>=4.25.0",
+    "openai>=1.101.0",
+    "pyyaml>=6.0.2",
+    "pydantic>=2.11.0",
+    "uvicorn>=0.35.0",
+]
 
 [dependency-groups]
 dev = [
@@ -18,4 +25,3 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-

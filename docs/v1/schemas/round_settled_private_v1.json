@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "round_settled_private_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "action_count",
+    "event_count",
+    "actions",
+    "events",
+    "status_before",
+    "status_after"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "round_settled_private_v1"
+    },
+    "action_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/action_entry"
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event_entry"
+      }
+    },
+    "status_before": {
+      "$ref": "#/$defs/status"
+    },
+    "status_after": {
+      "$ref": "#/$defs/status"
+    }
+  },
+  "$defs": {
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["water", "food", "exposure", "alive", "phase_ended"],
+      "properties": {
+        "water": { "type": "integer" },
+        "food": { "type": "integer" },
+        "exposure": { "type": "integer" },
+        "alive": { "type": "boolean" },
+        "phase_ended": { "type": "boolean" }
+      }
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["water", "food", "exposure"],
+      "properties": {
+        "water": { "type": "integer" },
+        "food": { "type": "integer" },
+        "exposure": { "type": "integer" }
+      }
+    },
+    "items_map": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "action_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_type", "cost", "before", "after", "result"],
+      "properties": {
+        "action_type": {
+          "type": "string",
+          "enum": ["MOVE", "EXPLORE", "USE", "TAKE", "REST", "ATTACK", "GET", "TOSS"]
+        },
+        "cost": { "$ref": "#/$defs/cost" },
+        "before": { "$ref": "#/$defs/status" },
+        "after": { "$ref": "#/$defs/status" },
+        "result": {
+          "oneOf": [
+            { "$ref": "#/$defs/move_result" },
+            { "$ref": "#/$defs/explore_result" },
+            { "$ref": "#/$defs/use_result" },
+            { "$ref": "#/$defs/take_result" },
+            { "$ref": "#/$defs/rest_result" },
+            { "$ref": "#/$defs/attack_result" },
+            { "$ref": "#/$defs/loot_action_result" }
+          ]
+        }
+      }
+    },
+    "move_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_type", "to", "immediate_death"],
+      "properties": {
+        "result_type": { "type": "string", "const": "MOVE_RESULT" },
+        "to": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y", "tile_type"],
+          "properties": {
+            "x": { "type": "integer" },
+            "y": { "type": "integer" },
+            "tile_type": { "type": "string", "enum": ["Q", "X", "J", "B", "S", "W", "M"] }
+          }
+        },
+        "immediate_death": { "type": "boolean" }
+      }
+    },
+    "explore_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_type", "snapshot"],
+      "properties": {
+        "result_type": { "type": "string", "const": "EXPLORE_RESULT" },
+        "snapshot": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["resources", "characters"],
+          "properties": {
+            "resources": { "$ref": "#/$defs/items_map" },
+            "characters": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "use_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_type", "used_items", "gains"],
+      "properties": {
+        "result_type": { "type": "string", "const": "USE_RESULT" },
+        "used_items": { "$ref": "#/$defs/items_map" },
+        "gains": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["water", "food"],
+          "properties": {
+            "water": { "type": "integer" },
+            "food": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "take_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_type", "requested", "obtained"],
+      "properties": {
+        "result_type": { "type": "string", "const": "TAKE_RESULT" },
+        "requested": { "$ref": "#/$defs/items_map" },
+        "obtained": { "$ref": "#/$defs/items_map" }
+      }
+    },
+    "rest_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_type", "phase_ended"],
+      "properties": {
+        "result_type": { "type": "string", "const": "REST_RESULT" },
+        "phase_ended": { "type": "boolean", "const": true }
+      }
+    },
+    "attack_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_type", "outcome"],
+      "properties": {
+        "result_type": { "type": "string", "const": "ATTACK_RESULT" },
+        "target_player_id": { "type": "string" },
+        "outcome": {
+          "type": "string",
+          "enum": ["NO_TARGET", "INVALID_TARGET", "STALEMATE", "WIN", "LOSE"]
+        },
+        "delta": { "type": "integer" },
+        "winner": { "type": "string" },
+        "loser": { "type": "string" },
+        "loot_window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["opened", "winner_player_id", "loser_player_id"],
+          "properties": {
+            "opened": { "type": "boolean", "const": true },
+            "winner_player_id": { "type": "string" },
+            "loser_player_id": { "type": "string" }
+          }
+        },
+        "loot": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "obtained"],
+          "properties": {
+            "type": { "type": "string", "enum": ["GET", "TOSS"] },
+            "obtained": { "$ref": "#/$defs/items_map" }
+          }
+        }
+      }
+    },
+    "loot_action_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_type", "choice", "obtained"],
+      "properties": {
+        "result_type": { "type": "string", "const": "LOOT_ACTION_RESULT" },
+        "choice": { "type": "string", "enum": ["GET", "TOSS"] },
+        "obtained": { "$ref": "#/$defs/items_map" }
+      }
+    },
+    "event_entry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event_type", "delta"],
+          "properties": {
+            "event_type": { "type": "string", "const": "BASE_UPKEEP" },
+            "delta": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["water", "food", "exposure"],
+              "properties": {
+                "water": { "type": "integer" },
+                "food": { "type": "integer" },
+                "exposure": { "type": "integer" }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event_type", "reason"],
+          "properties": {
+            "event_type": { "type": "string", "const": "DEATH" },
+            "reason": { "type": "string", "enum": ["RESOURCE_ZERO", "NIGHT_X_FAIL"] },
+            "sample": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event_type", "choice", "obtained"],
+          "properties": {
+            "event_type": { "type": "string", "const": "LOOT_WINDOW_RESOLVED" },
+            "choice": { "type": "string", "enum": ["GET", "TOSS"] },
+            "obtained": { "$ref": "#/$defs/items_map" }
+          }
+        }
+      ]
+    }
+  }
+}
