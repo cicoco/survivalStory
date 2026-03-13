@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "loot_window_started_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "message",
+    "winner_player_id",
+    "loser_player_id",
+    "expires_at"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "loot_window_started_v1"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "winner_player_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "loser_player_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

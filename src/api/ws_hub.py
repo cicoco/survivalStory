@@ -12,7 +12,6 @@ class WsHub:
         self._connections: dict[tuple[str, str], set[WebSocket]] = defaultdict(set)
 
     async def connect(self, room_id: str, player_id: str, ws: WebSocket) -> None:
-        await ws.accept()
         self._connections[(room_id, player_id)].add(ws)
 
     def disconnect(self, room_id: str, player_id: str, ws: WebSocket) -> None:
@@ -37,4 +36,3 @@ class WsHub:
     async def fanout(self, room_id: str, messages: list[dict]) -> None:
         for row in messages:
             await self.send_to_player(room_id, row["player_id"], row["message"])
-

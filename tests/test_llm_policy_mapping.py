@@ -4,7 +4,9 @@ import sys
 import types
 import unittest
 
-if "jsonschema" not in sys.modules:
+try:
+    import jsonschema  # noqa: F401
+except ModuleNotFoundError:
     jsonschema_stub = types.ModuleType("jsonschema")
     jsonschema_stub.ValidationError = Exception
 
@@ -62,6 +64,22 @@ class LLMPolicyMappingTest(unittest.TestCase):
         )
         self.assertEqual("TOSS", out["action_type"])
         self.assertEqual({}, out["payload"])
+
+    def test_build_prompt_includes_phase_c_focus_fields(self) -> None:
+        policy = object.__new__(LLMPolicy)
+        obs = {
+            "position": {"x": 4, "y": 4},
+            "recent_positions": [{"x": 4, "y": 4, "day": 1, "phase": "DAY", "round": 1}],
+            "local_map_summary": {
+                "window_size": 5,
+                "center": {"x": 4, "y": 4},
+                "tiles": [{"x": 4, "y": 4, "in_bounds": True, "tile_type": "M"}],
+            },
+        }
+        prompt = policy._build_prompt(obs, ["MOVE", "REST"], "# Skill\\nDemo")
+        self.assertIn("Decision Focus JSON", prompt)
+        self.assertIn("recent_positions", prompt)
+        self.assertIn("local_map_summary", prompt)
 
 
 if __name__ == "__main__":

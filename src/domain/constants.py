@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Final
 
+# 阶段与房间生命周期
 PHASE_DAY: Final[str] = "DAY"
 PHASE_NIGHT: Final[str] = "NIGHT"
 ROOM_STATUS_WAITING: Final[str] = "WAITING"
@@ -15,7 +16,9 @@ END_MODE_HUMAN_ALL_DEAD: Final[str] = "HUMAN_ALL_DEAD"
 END_MODE_HOST_LEFT: Final[str] = "HOST_LEFT"
 MAX_ROOM_PLAYERS: Final[int] = 6
 MAX_TAKE_ITEMS_PER_ACTION: Final[int] = 3
+ATTACK_WIN_DELTA_THRESHOLD: Final[int] = 1
 
+# 玩家动作类型
 ACTION_MOVE: Final[str] = "MOVE"
 ACTION_EXPLORE: Final[str] = "EXPLORE"
 ACTION_USE: Final[str] = "USE"
@@ -38,17 +41,20 @@ CORE_ACTION_TYPES: Final[frozenset[str]] = frozenset(
 FOLLOW_UP_ACTION_TYPES: Final[frozenset[str]] = frozenset({ACTION_GET, ACTION_TOSS})
 ALL_ACTION_TYPES: Final[frozenset[str]] = CORE_ACTION_TYPES | FOLLOW_UP_ACTION_TYPES
 
+# 战利品窗口动作类型
 LOOT_TYPE_GET: Final[str] = "GET"
 LOOT_TYPE_TOSS: Final[str] = "TOSS"
 LOOT_TYPES: Final[frozenset[str]] = frozenset({LOOT_TYPE_GET, LOOT_TYPE_TOSS})
 
+# 信息可见性状态：仅保留未探索与已有记忆两态。
 INFO_STATE_UNEXPLORED: Final[str] = "UNEXPLORED"
-INFO_STATE_SNAPSHOT: Final[str] = "SNAPSHOT"
-INFO_STATE_STALE: Final[str] = "STALE"
+INFO_STATE_HAS_MEMORY: Final[str] = "HAS_MEMORY"
 
+# 地图与地块类型
 TILE_Q: Final[str] = "Q"
 TILE_X: Final[str] = "X"
 SAFE_TILES: Final[set[str]] = {"J", "B", "S", "W", "M"}
+SPAWN_ALLOWED_TILES: Final[frozenset[str]] = frozenset({"J", "B", "S", "M"})
 
 MAP_MATRIX: Final[list[list[str]]] = [
     ["Q", "Q", "Q", "Q", "Q", "Q", "Q", "Q", "Q"],
@@ -62,6 +68,7 @@ MAP_MATRIX: Final[list[list[str]]] = [
     ["Q", "Q", "Q", "Q", "Q", "Q", "Q", "Q", "Q"],
 ]
 
+# 角色初始背包与状态
 INITIAL_INVENTORY: Final[dict[str, int]] = {
     "bottled_water": 1,
     "bread": 1,
@@ -75,12 +82,23 @@ INITIAL_STATUS: Final[dict[str, int]] = {
 
 MAX_STATUS: Final[int] = 100
 
-BUILDING_INVENTORY_DEFAULTS: Final[dict[str, dict[str, int]]] = {
-    "J": {"bread": 3, "bottled_water": 3},
-    "B": {"compressed_biscuit": 4},
-    "S": {"canned_food": 5, "barrel_water": 5},
-    "W": {"clean_water": 6},
-    "M": {},
+# 建筑资源池规则：每类建筑允许生成的物资类型
+BUILDING_ALLOWED_ITEMS: Final[dict[str, frozenset[str]]] = {
+    "J": frozenset({"bread", "bottled_water"}),
+    "B": frozenset({"compressed_biscuit", "barrel_water"}),
+    "S": frozenset({"canned_food", "barrel_water", "bread", "bottled_water"}),
+    "W": frozenset({"clean_water"}),
+    "M": frozenset({"bottled_water"}),
+}
+
+# Default global resource supply (total units) for one match.
+RESOURCE_TOTAL_DEFAULTS: Final[dict[str, int]] = {
+    "bread": 27,
+    "bottled_water": 27,
+    "compressed_biscuit": 24,
+    "canned_food": 10,
+    "barrel_water": 10,
+    "clean_water": 36,
 }
 
 ITEM_EFFECTS: Final[dict[str, dict[str, int]]] = {
@@ -92,6 +110,7 @@ ITEM_EFFECTS: Final[dict[str, dict[str, int]]] = {
     "clean_water": {"water": 15},
 }
 
+# 各动作的额外状态消耗/变化（基础维持消耗在结算流程中另算）
 ACTION_COSTS: Final[dict[str, dict[str, int]]] = {
     "MOVE": {"water": -2, "food": -1, "exposure": 2},
     "EXPLORE": {"water": -1, "food": -1, "exposure": 1},
@@ -103,6 +122,7 @@ ACTION_COSTS: Final[dict[str, dict[str, int]]] = {
     "TOSS": {"water": 0, "food": 0, "exposure": 0},
 }
 
+# 死亡原因枚举：用于结算记录与终局统计
 DEATH_REASON_RESOURCE_ZERO: Final[str] = "RESOURCE_ZERO"
 DEATH_REASON_NIGHT_X_FAIL: Final[str] = "NIGHT_X_FAIL"
 DEATH_REASON_LEFT_IN_GAME: Final[str] = "LEFT_IN_GAME"

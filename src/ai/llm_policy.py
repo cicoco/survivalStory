@@ -89,17 +89,33 @@ class LLMPolicy(Policy):
             _ = start
 
     def _build_prompt(self, obs: dict, action_mask: list[str], skill_block: str) -> str:
+        decision_focus = self._build_decision_focus(obs)
         # Fixed 4-section assembly as required by V1.
         return (
             "System Rules:\n"
             "- Follow game constraints and action_mask strictly.\n"
+            "- Use recent_positions and local_map_summary as primary movement context.\n"
             "- Return schema-compliant JSON only.\n\n"
             f"Skill Template:\n{skill_block}\n\n"
             f"State JSON:\n{json.dumps(obs, ensure_ascii=False)}\n\n"
+            f"Decision Focus JSON:\n{json.dumps(decision_focus, ensure_ascii=False)}\n\n"
             "Constraint(action_mask/schema):\n"
             f"- action_mask={json.dumps(action_mask, ensure_ascii=False)}\n"
             "- schema=choose_action_v1\n"
         )
+
+    def _build_decision_focus(self, obs: dict) -> dict[str, Any]:
+        # 强化关键输入：让 LLM 明确消费最近轨迹与局部地图摘要。
+        recent_positions = obs.get("recent_positions", [])
+        if not isinstance(recent_positions, list):
+            recent_positions = []
+        local_map_summary = obs.get("local_map_summary", {})
+        if not isinstance(local_map_summary, dict):
+            local_map_summary = {}
+        return {
+            "recent_positions": recent_positions,
+            "local_map_summary": local_map_summary,
+        }
 
     def _to_internal_action(self, schema_action: dict[str, Any], obs: dict) -> dict:
         action_type = str(schema_action["action_type"])
@@ -133,7 +149,7 @@ class LLMPolicy(Policy):
 
         if action_type == ACTION_ATTACK:
             target = payload.get("target_player_id")
-            return {"action_type": ACTION_ATTACK, "payload": {"target_id": target, "loot": {"type": ACTION_TOSS}}}
+            return {"action_type": ACTION_ATTACK, "payload": {"target_id": target}}
 
         if action_type in {ACTION_EXPLORE, ACTION_REST, ACTION_TOSS}:
             if action_type == ACTION_TOSS:

@@ -17,6 +17,7 @@ ERR_ACTION_NOT_ALLOWED_ON_TILE_SUFFIX: Final[str] = "is only allowed on safe bui
 ERR_TAKE_REQUIRES_EXPLORE: Final[str] = "TAKE requires prior EXPLORE at current tile"
 ERR_ATTACK_TARGET_SELF: Final[str] = "ATTACK cannot target self"
 ERR_ATTACK_TARGET_DEAD: Final[str] = "ATTACK target is dead"
+ERR_ATTACK_TARGET_PHASE_ENDED: Final[str] = "ATTACK target already rested in current phase"
 ERR_ATTACK_TARGET_NOT_SAME_TILE: Final[str] = "ATTACK target must be in same tile"
 ERR_ATTACK_TARGET_NOT_DISCOVERED: Final[str] = "ATTACK target must be discovered first"
 ERR_ATTACK_TARGET_ID_INVALID: Final[str] = "ATTACK payload.target_id must be non-empty string"

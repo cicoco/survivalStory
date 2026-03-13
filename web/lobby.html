@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>末日求生大厅</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="head">
+        <div>
+          <h1 class="title">末日废墟生存战</h1>
+          <p class="subtitle">左侧个人信息，右侧动态控制面板，底部房间列表。</p>
+        </div>
+      </header>
+
+      <section class="layout lobby-main">
+        <article class="panel dark">
+          <h2>个人信息</h2>
+          <div>
+            <label>玩家 ID</label>
+            <input id="playerId" value="u2" />
+          </div>
+          <div class="hint" style="margin-top: 8px">当前大厅操作均使用该玩家身份。</div>
+          <div class="btn-row" style="margin-top: 10px">
+            <button id="clearStateBtn" class="ghost">清空本地状态</button>
+          </div>
+        </article>
+
+        <article class="panel dark">
+          <h2 id="controlTitle">控制面板</h2>
+
+          <section id="stateCreate">
+            <h3>创建房间</h3>
+            <div class="row">
+              <div>
+                <label>房间 ID</label>
+                <input id="createRoomId" value="room-alpha" />
+              </div>
+              <div>
+                <label>终局模式</label>
+                <select id="createEndMode">
+                  <option value="ALL_DEAD">ALL_DEAD</option>
+                  <option value="HUMAN_ALL_DEAD">HUMAN_ALL_DEAD</option>
+                </select>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button id="createBtn">创建房间</button>
+            </div>
+            <div class="hint" style="margin-top: 8px">创建成功后将自动切换为房主管理视图。</div>
+          </section>
+
+          <section id="stateHost" style="display: none">
+            <h3>房主管理</h3>
+            <div class="kvs">
+              <div class="kv"><div class="k">房间</div><div class="v mono" id="hostRoomId">-</div></div>
+              <div class="kv"><div class="k">状态</div><div class="v mono" id="hostRoomStatus">-</div></div>
+              <div class="kv"><div class="k">人数</div><div class="v mono" id="hostRoomCount">-</div></div>
+              <div class="kv"><div class="k">我是房主</div><div class="v mono">是</div></div>
+            </div>
+            <div class="btn-row" style="margin-top: 10px">
+              <button id="hostStartBtn">开局游戏</button>
+              <button class="warn" id="hostCloseBtn">关闭房间</button>
+              <button class="alt" id="hostEnterBtn">进入游戏页</button>
+            </div>
+          </section>
+
+          <section id="stateMember" style="display: none">
+            <h3>房间状态</h3>
+            <div class="kvs">
+              <div class="kv"><div class="k">房间</div><div class="v mono" id="memberRoomId">-</div></div>
+              <div class="kv"><div class="k">状态</div><div class="v mono" id="memberRoomStatus">-</div></div>
+              <div class="kv"><div class="k">人数</div><div class="v mono" id="memberRoomCount">-</div></div>
+              <div class="kv"><div class="k">房主</div><div class="v mono" id="memberRoomHost">-</div></div>
+            </div>
+            <div class="btn-row" style="margin-top: 10px">
+              <button class="warn" id="memberLeaveBtn">退出房间</button>
+              <button class="alt" id="memberEnterBtn">进入游戏页</button>
+            </div>
+            <div class="hint" style="margin-top: 8px">等待房主开局。开局后可直接进入游戏页。</div>
+          </section>
+        </article>
+      </section>
+
+      <section class="panel" style="margin-top: 16px">
+        <div class="btn-row" style="justify-content: space-between; align-items: center">
+          <h2 style="margin: 0">房间列表</h2>
+          <button class="ghost" id="refreshRoomsBtn">刷新</button>
+        </div>
+        <div class="row" style="margin-top: 10px">
+          <div>
+            <label>搜索房间</label>
+            <input id="roomSearch" placeholder="输入 room_id 关键字" />
+          </div>
+          <div>
+            <label>过滤状态</label>
+            <select id="roomStatusFilter">
+              <option value="">全部状态</option>
+              <option value="WAITING">WAITING</option>
+              <option value="IN_GAME">IN_GAME</option>
+              <option value="CLOSED">CLOSED</option>
+              <option value="DISBANDED">DISBANDED</option>
+            </select>
+          </div>
+        </div>
+        <div id="roomList" class="feed" style="margin-top: 8px"></div>
+      </section>
+
+    </main>
+
+    <script src="/assets/lobby.js"></script>
+  </body>
+</html>

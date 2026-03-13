@@ -94,7 +94,8 @@
             { "$ref": "#/$defs/take_result" },
             { "$ref": "#/$defs/rest_result" },
             { "$ref": "#/$defs/attack_result" },
-            { "$ref": "#/$defs/loot_action_result" }
+            { "$ref": "#/$defs/loot_action_result" },
+            { "$ref": "#/$defs/interrupted_result" }
           ]
         }
       }
@@ -186,6 +187,10 @@
           "type": "string",
           "enum": ["NO_TARGET", "INVALID_TARGET", "STALEMATE", "WIN", "LOSE"]
         },
+        "reason": {
+          "type": "string",
+          "enum": ["TARGET_UNAVAILABLE", "TARGET_PHASE_ENDED", "TARGET_LEFT_TILE"]
+        },
         "delta": { "type": "integer" },
         "winner": { "type": "string" },
         "loser": { "type": "string" },
@@ -218,6 +223,15 @@
         "result_type": { "type": "string", "const": "LOOT_ACTION_RESULT" },
         "choice": { "type": "string", "enum": ["GET", "TOSS"] },
         "obtained": { "$ref": "#/$defs/items_map" }
+      }
+    },
+    "interrupted_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_type", "reason"],
+      "properties": {
+        "result_type": { "type": "string", "const": "INTERRUPTED" },
+        "reason": { "type": "string", "const": "DEFEATED_IN_ATTACK" }
       }
     },
     "event_entry": {

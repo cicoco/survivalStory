@@ -21,6 +21,7 @@ class NotificationService:
         payload: dict,
         *,
         private_payload_by_player: dict[str, dict] | None = None,
+        trace_id: str | None = None,
     ) -> list[dict]:
         match = room.match_state
         day = match.day if match else 0
@@ -38,6 +39,8 @@ class NotificationService:
             "event_type": event_type,
             "payload": payload,
         }
+        if trace_id is not None:
+            base["trace_id"] = trace_id
 
         emitted: list[dict] = []
         for player_id in room.players:
@@ -54,6 +57,8 @@ class NotificationService:
         target_player_id: str,
         event_type: str,
         payload: dict,
+        *,
+        trace_id: str | None = None,
     ) -> dict:
         match = room.match_state
         day = match.day if match else 0
@@ -71,6 +76,8 @@ class NotificationService:
             "event_type": event_type,
             "payload": payload,
         }
+        if trace_id is not None:
+            message["trace_id"] = trace_id
         self._append_history(room.room_id, target_player_id, message)
         return {"player_id": target_player_id, "message": message}
 

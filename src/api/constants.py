@@ -4,20 +4,27 @@ from __future__ import annotations
 
 from typing import Final
 
+# 对外事件名（WS + 历史消息）
 EVENT_GAME_STARTED: Final[str] = "GAME_STARTED"
 EVENT_ROUND_STARTED: Final[str] = "ROUND_STARTED"
 EVENT_ACTION_ACCEPTED: Final[str] = "ACTION_ACCEPTED"
 EVENT_ROUND_SETTLED: Final[str] = "ROUND_SETTLED"
 EVENT_ACTION_REJECTED: Final[str] = "ACTION_REJECTED"
+EVENT_LOOT_WINDOW_STARTED: Final[str] = "LOOT_WINDOW_STARTED"
+EVENT_LOOT_WINDOW_RESOLVED: Final[str] = "LOOT_WINDOW_RESOLVED"
 EVENT_PLAYER_LEFT: Final[str] = "PLAYER_LEFT"
 EVENT_ROOM_DISBANDED: Final[str] = "ROOM_DISBANDED"
 EVENT_ROOM_CLOSED: Final[str] = "ROOM_CLOSED"
 EVENT_GAME_OVER: Final[str] = "GAME_OVER"
 
+# 出站 payload schema 标识
 SCHEMA_ACTION_REJECTED_V1: Final[str] = "action_rejected_v1"
 SCHEMA_ROUND_SETTLED_PRIVATE_V1: Final[str] = "round_settled_private_v1"
 SCHEMA_GAME_OVER_SUMMARY_V1: Final[str] = "game_over_summary_v1"
+SCHEMA_LOOT_WINDOW_STARTED_V1: Final[str] = "loot_window_started_v1"
+SCHEMA_LOOT_WINDOW_RESOLVED_V1: Final[str] = "loot_window_resolved_v1"
 
+# 稳定错误码（供前端与测试按码处理）
 ERROR_ACTION_INVALID: Final[str] = "ACTION_INVALID"
 ERROR_UNKNOWN_PLAYER: Final[str] = "UNKNOWN_PLAYER"
 ERROR_PHASE_ENDED: Final[str] = "PHASE_ENDED"
@@ -36,6 +43,7 @@ ERROR_ONLY_HOST_CAN_RESET: Final[str] = "ONLY_HOST_CAN_RESET"
 ROUND_SETTLED_MESSAGE: Final[str] = "round settled"
 ROUND_STARTED_PROMPT_SUFFIX: Final[str] = "choose action"
 LOOT_WINDOW_STARTED_MESSAGE: Final[str] = "loot window opened, winner choose GET/TOSS"
+LOOT_WINDOW_RESOLVED_MESSAGE: Final[str] = "loot window resolved"
 
 
 def build_game_started_message(room_id: str, player_count: int) -> str:

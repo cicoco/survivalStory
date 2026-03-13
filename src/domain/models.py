@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from src.domain.constants import (
@@ -31,6 +31,8 @@ class PlayerState:
     explored_tiles: set[str] = field(default_factory=set)
     known_characters: set[str] = field(default_factory=set)
     building_memory: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # 最近移动轨迹（有界）：用于策略层避免短周期往返移动。
+    recent_positions: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -85,6 +87,8 @@ class PlayerMatchStats:
     days_survived: int = 0
     resources_obtained_total: int = 0
     resources_obtained: dict[str, int] = field(default_factory=dict)
+    combat_wins: int = 0
+    combat_losses: int = 0
     kills: int = 0
     deaths: int = 0
     death_reason: str | None = None
@@ -102,5 +106,6 @@ class Room:
     status: str = ROOM_STATUS_WAITING
     join_seq_counter: int = 0
     server_seq_counter: int = 0
+    waiting_since: datetime = field(default_factory=lambda: datetime.now(UTC))
     players: dict[str, PlayerState] = field(default_factory=dict)
     match_state: MatchState | None = None

@@ -63,9 +63,12 @@
           "player_id",
           "is_human",
           "days_survived",
+          "explored_tiles_count",
           "resources_obtained_total",
           "resources_obtained",
           "death_reason",
+          "combat_wins",
+          "combat_losses",
           "kills",
           "deaths"
         ],
@@ -78,6 +81,10 @@
             "type": "boolean"
           },
           "days_survived": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "explored_tiles_count": {
             "type": "integer",
             "minimum": 0
           },
@@ -95,6 +102,14 @@
           "death_reason": {
             "type": "string",
             "minLength": 1
+          },
+          "combat_wins": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "combat_losses": {
+            "type": "integer",
+            "minimum": 0
           },
           "kills": {
             "type": "integer",
@@ -115,6 +130,8 @@
         "alive_human_player_ids",
         "human_survival_days",
         "human_survival_days_max",
+        "human_combat_wins_total",
+        "human_combat_losses_total",
         "human_kills_total",
         "human_deaths_total"
       ],
@@ -139,6 +156,14 @@
           }
         },
         "human_survival_days_max": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "human_combat_wins_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "human_combat_losses_total": {
           "type": "integer",
           "minimum": 0
         },

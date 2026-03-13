@@ -9,10 +9,14 @@
 - 运行 pytest（可选）：`uv run pytest`
 - 运行 ruff（可选）：`uv run ruff check .`
 - 启动 API 服务（Phase 3）：`uv run uvicorn src.api.app:app --reload`
+- 大厅页（同服务部署）：`http://127.0.0.1:8000/lobby`
+- 游戏页（同服务部署）：`http://127.0.0.1:8000/game?room_id=xxx&player_id=yyy`
+  - 地图资源图位于前端配置：`web/assets/game.js` 中 `TILE_IMAGE_URLS`（可替换为你的方形图片地址）
 - 手动触发 AI 自动补动作：`POST /rooms/{room_id}/tick-ai`
 - 玩家离开房间：`POST /rooms/{room_id}/leave`
 - 终局摘要查询：`GET /rooms/{room_id}/summary`
 - 终局后重置房间：`POST /rooms/{room_id}/reset`
+- 房间列表（状态/人数/是否开局）：`GET /rooms`
 
 ## AI 策略运行方式
 
@@ -21,8 +25,11 @@
 - OpenAI：`ai.policy = "llm"` 并填写 `openai.api_key`
 - 可选模型：`openai.model = "gpt-4.1-mini"`
 - 通知历史窗口：`notification.history_limit = 100`
+- 后端调试日志：`backend.debug_log = false`
 - 战利品窗口超时：`gameplay.loot_window_timeout_sec = 60`
 - 核心动作超时：`gameplay.round_action_timeout_sec = 90`
+- 白天阶段最大轮次：`gameplay.max_day_phase_rounds = 99`
+- 夜晚阶段最大轮次：`gameplay.max_night_phase_rounds = 99`
 - 房间最大人数：`gameplay.room_max_players = 6`
 - AI 最大补全数：`gameplay.max_ai_players = 5`
 
@@ -31,6 +38,7 @@
 
 环境变量仍可覆盖配置文件（例如 CI）：
 - `APP_CONFIG`（指定配置文件路径）
+- `BACKEND_DEBUG_LOG`
 - `AI_POLICY`
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
@@ -38,6 +46,8 @@
 - `NOTIFICATION_HISTORY_LIMIT`
 - `LOOT_WINDOW_TIMEOUT_SEC`
 - `ROUND_ACTION_TIMEOUT_SEC`
+- `MAX_DAY_PHASE_ROUNDS`
+- `MAX_NIGHT_PHASE_ROUNDS`
 - `ROOM_MAX_PLAYERS`
 - `MAX_AI_PLAYERS`
 
@@ -74,6 +84,7 @@
 
 - 房间总人数上限：真人 + AI 不能超过 `room_max_players`。
 - AI 自动补全上限：仅补到 `max_ai_players`，不会强制补满房间。
+- 后台定时清理：每 3 分钟扫描一次“等待中且未开局”房间；等待超过 3 分钟会自动解散。
 
 ## 终局与重置（V1）
 

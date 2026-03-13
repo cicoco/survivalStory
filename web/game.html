@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>末日求生游戏面板</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="head">
+        <div>
+          <h1 class="title">末日求生战场</h1>
+          <p class="subtitle">左侧地图作战，右侧面板查看信息与历史。</p>
+        </div>
+        <div class="btn-row">
+          <a class="ghost nav-btn" id="toLobbyBtn" href="/lobby">返回大厅</a>
+          <span class="status-chip"><span class="dot" id="wsDot"></span>连接状态：<b id="wsText">未连接</b></span>
+        </div>
+      </header>
+
+      <div id="roundPrompt" class="round-prompt" style="display: none"></div>
+
+      <section class="layout game-stage">
+        <article class="panel map-stage">
+          <div class="map-top">
+            <div class="btn-row">
+              <span class="hint">进入页面后自动连接与同步数据</span>
+            </div>
+          </div>
+
+          <div class="map-wrap">
+            <div class="hint">地图格子固定正方形。点击任意格子会弹出操作面板。</div>
+            <div id="mapGrid" class="map-grid game-map"></div>
+          </div>
+        </article>
+
+        <article class="panel dark side-stack">
+          <div class="tab-head">
+            <button type="button" class="tab-btn active" data-tab="game">游戏</button>
+            <button type="button" class="tab-btn" data-tab="history">历史</button>
+          </div>
+
+          <section id="tabGame" class="tab-pane active">
+            <details class="fold" open>
+              <summary>调试功能</summary>
+              <div class="btn-row" style="margin-top: 8px">
+                <button class="alt" id="connectBtn">连接WS</button>
+                <button class="ghost" id="refreshBtn">刷新</button>
+                <button class="ghost" id="pullBtn">拉历史</button>
+                <button id="startBtn">开局</button>
+                <button class="alt" id="tickBtn">触发 AI</button>
+                <button class="warn" id="leaveBtn">离开房间</button>
+                <button class="ghost" id="summaryBtn">终局摘要</button>
+                <button class="warn" id="resetBtn">重置房间</button>
+              </div>
+            </details>
+
+            <details class="fold" open>
+              <summary>玩家信息</summary>
+              <div class="kvs" style="margin-top: 8px">
+                <div class="kv"><div class="k">房间 ID</div><div class="v mono" id="roomIdText">-</div></div>
+                <div class="kv"><div class="k">玩家 ID</div><div class="v mono" id="playerIdText">-</div></div>
+                <!-- <div class="kv"><div class="k">身份</div><div class="v mono" id="identity">-</div></div> -->
+                <div class="kv"><div class="k">当前位置</div><div class="v mono" id="position">-</div></div>
+                <div class="kv"><div class="k">信息状态</div><div class="v mono" id="infoState">-</div></div>
+              </div>
+            </details>
+
+            <details class="fold" open>
+              <summary>阶段信息</summary>
+              <div class="kvs" style="margin-top: 8px">
+                <div class="kv"><div class="k">时间态</div><div class="v mono" id="timeState">-</div></div>
+                <div class="kv"><div class="k">阶段结束</div><div class="v mono" id="phaseEnded">-</div></div>
+              </div>
+            </details>
+
+            <details class="fold" open>
+              <summary>角色状态</summary>
+              <div class="kvs" style="margin-top: 8px">
+                <div class="kv"><div class="k">水分</div><div class="v mono" id="statusWater">-</div></div>
+                <div class="kv"><div class="k">饱食</div><div class="v mono" id="statusFood">-</div></div>
+                <div class="kv"><div class="k">暴露</div><div class="v mono" id="statusExposure">-</div></div>
+                <div class="kv"><div class="k">存活</div><div class="v mono" id="statusAlive">-</div></div>
+              </div>
+            </details>
+
+            <details class="fold">
+              <summary>背包信息</summary>
+              <pre id="inventory" class="mono">{}</pre>
+            </details>
+
+            <details class="fold">
+              <summary>建筑快照</summary>
+              <pre id="snapshot" class="mono">{}</pre>
+            </details>
+
+          </section>
+
+          <section id="tabHistory" class="tab-pane">
+            <div class="btn-row" style="margin-bottom: 8px">
+              <button class="ghost" id="historyRefreshBtn">手动刷新</button>
+              <button class="ghost" id="historyPullBtn">手动拉取</button>
+              <button class="ghost" id="historyClearBtn">清空历史</button>
+            </div>
+            <div id="feed" class="feed"></div>
+          </section>
+        </article>
+      </section>
+    </main>
+
+    <div id="tileActionModal" class="modal" style="display: none">
+      <div class="modal-card">
+        <div class="btn-row" style="justify-content: space-between; align-items: center">
+          <h3 style="margin: 0">格子操作</h3>
+          <button class="ghost" id="modalCloseBtn">关闭</button>
+        </div>
+        <div class="kvs" style="margin-top: 10px">
+          <div class="kv"><div class="k">选中格子</div><div class="v mono" id="modalTileInfo">-</div></div>
+          <div class="kv"><div class="k">可用动作</div><div class="v mono" id="modalAllowedActions">-</div></div>
+        </div>
+        <div style="margin-top: 10px">
+          <label>动作类型</label>
+          <select id="modalActionType"></select>
+        </div>
+        <div style="margin-top: 10px">
+          <label>操作目标</label>
+          <div id="modalTargetBox" class="selection-box mono">当前动作无需选择目标</div>
+        </div>
+        <div id="modalTargetHint" class="hint" style="margin-top: 8px">-</div>
+        <div class="btn-row">
+          <button class="alt" id="modalSubmitBtn">提交动作</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="moveConfirmModal" class="modal" style="display: none">
+      <div class="modal-card">
+        <h3 style="margin: 0">移动确认</h3>
+        <p id="moveConfirmText" style="margin: 10px 0 14px; color: var(--muted)">确认移动？</p>
+        <div class="btn-row" style="justify-content: flex-end">
+          <button class="ghost" id="moveConfirmCancelBtn">取消</button>
+          <button class="alt" id="moveConfirmSubmitBtn">确认移动</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="roundSettlementModal" class="modal" style="display: none">
+      <div class="modal-card round-settlement-card">
+        <h3 id="roundSettlementModalTitle" style="margin: 0">本回合结算结果</h3>
+        <pre id="roundSettlementModalText" class="result-text" style="margin-top: 10px">暂无结算</pre>
+        <div id="roundSettlementModalRich" class="result-rich" style="display: none; margin-top: 10px"></div>
+        <div class="btn-row" style="justify-content: flex-end">
+          <button class="alt" id="roundSettlementOkBtn">确认</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="attackOutcomeModal" class="modal" style="display: none">
+      <div class="modal-card combat-modal-card">
+        <h3 style="margin: 0">战斗结果</h3>
+        <p id="attackOutcomeText" class="combat-lead">战斗结果待定</p>
+        <div id="attackOutcomeLootSection" class="combat-loot-section" style="display: none">
+          <div class="combat-loot-grid">
+            <div class="combat-loot-pane">
+              <label>对方背包</label>
+              <div id="lootChoiceOpponentInventory" class="selection-box mono">无</div>
+            </div>
+            <div class="combat-loot-pane">
+              <label>战后处理</label>
+              <select id="lootChoiceAction">
+                <option value="GET">掠夺</option>
+                <option value="TOSS">放弃</option>
+              </select>
+            </div>
+          </div>
+          <div class="combat-loot-pane">
+            <label>掠夺物品（总计最多 3 件）</label>
+            <div id="lootChoiceItemsPicker" class="selection-box mono">暂无可掠夺物资</div>
+          </div>
+          <div id="lootChoiceHint" class="hint combat-hint">说明：你最多可以掠夺总计 3 件战利品放入自己的背包。</div>
+        </div>
+        <div class="btn-row combat-actions">
+          <button class="alt" id="lootChoiceSubmitBtn" style="display: none">提交战后处理</button>
+          <button class="alt" id="attackOutcomeOkBtn">我知道了</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/assets/game.js"></script>
+  </body>
+</html>

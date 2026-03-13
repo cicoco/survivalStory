@@ -22,3 +22,6 @@ class RoomStore:
 
     def remove(self, room_id: str) -> None:
         self._rooms.pop(room_id, None)
+
+    def list_all(self) -> list[Room]:
+        return list(self._rooms.values())

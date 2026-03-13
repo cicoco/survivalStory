@@ -1,3 +1,7 @@
+[backend]
+debug_log = true
+log_level = "DEBUG"
+
 [ai]
 policy = "rule"
 
@@ -14,5 +18,7 @@ history_limit = 100
 [gameplay]
 loot_window_timeout_sec = 60
 round_action_timeout_sec = 90
+max_day_phase_rounds = 99
+max_night_phase_rounds = 99
 room_max_players = 2
 max_ai_players = 1
